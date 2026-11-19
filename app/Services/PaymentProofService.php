@@ -83,6 +83,15 @@ class PaymentProofService
             throw new ConflictException('لا يمكن رفع إشعار تحويل لهذا الطلب نظراً لحالته الحالية: ' . OrderStateMachine::getStatusLabel($order->status));
         }
 
+        // Rate limit: max 5 uploads per order per hour to protect against disk exhaustion
+        $oneHourAgo = gmdate('Y-m-d H:i:s', time() - 3600);
+        $recentUploads = $this->paymentProofs->where('order_id', $order->id)
+            ->where('created_at >=', $oneHourAgo)
+            ->countAllResults();
+        if ($recentUploads >= 5) {
+            throw new \App\Exceptions\TooManyRequestsException('تم تجاوز الحد المسموح لمحاولات رفع إشعار التحويل لهذا الطلب (بحد أقصى 5 محاولات في الساعة).');
+        }
+
         $isValid = $uploadedFile && (
             $uploadedFile->isValid() ||
             (ENVIRONMENT === 'testing' && $uploadedFile->getError() === UPLOAD_ERR_OK && file_exists($uploadedFile->getTempName()))

@@ -52,3 +52,8 @@ This document tracks all design and technical decisions made for the **wex-api**
 
 ### 10. Traversy Media Code Style
 - **Decision:** Clean, beginner-friendly PHP with descriptive names, thin controllers, business logic encapsulated in single-responsibility services, PSR-12 formatting, and Arabic user-facing messages centralized in `app/Language/ar/Api.php`.
+
+### 11. Role Safeguards & Administrative Audit Trail
+- **Decision:** All administrative actions (exchange rate modifications, order status transitions, manual price-lock extensions, payment proof approvals/rejections, shop settings updates, and user role/status changes) are recorded to the `audit_logs` table with user ID, action name, entity type, ID, old/new values, IP address, and user agent.
+- **Safeguards:** Self-modification locks in `UserAdminController` prevent administrators from demoting their own role or deactivating their own account, preventing accidental total lockout of administrative access.
+

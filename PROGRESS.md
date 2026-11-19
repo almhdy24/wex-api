@@ -70,12 +70,16 @@
   - User management (role changes, active status, spending totals)
   - Audit logging service & viewer endpoint
   - Automated tests passing in `tests/feature/AdminTest.php` (9 tests, 37 assertions)
-- [ ] **Phase 9: Security Audit & Hardening**
-  - Complete security checklist verification
-  - Input validation review & rate limit testing
-  - Composer audit & PHP linting (`php -l`)
-  - Documentation completion (`API.md`, `DATABASE.md`, `DEPLOYMENT.md`, `curl-examples.md`)
+- [x] **Phase 9: Security Audit & Hardening**
+  - Complete security checklist verification (mass assignment protection, IDOR checks, upload hardening, rate limiting, token family revocation)
+  - GD EXIF stripping & private payment proofs storage verified
+  - Composer audit: 0 vulnerabilities found
+  - Full codebase PHP linting (`php -l`): zero syntax errors
+  - Comprehensive documentation completed (`docs/API.md`, `docs/DATABASE.md`, `docs/DEPLOYMENT.md`, `docs/curl-examples.md`, `docs/DECISIONS.md`, `README.md`)
 - [ ] **Phase 10: Final Review & Double Check**
+  - Full automated test suite run
+  - End-to-end smoke testing with curl against running server
+  - Clean clone validation check
   - Full automated test suite run
   - End-to-end smoke testing with curl against running server
   - Clean clone validation check
@@ -145,25 +149,19 @@
 - Implemented `AuditAdminController` (`GET /api/v1/admin/audit-logs`) with filtering by action, user ID, entity name, and date range.
 - Added comprehensive automated feature tests in `tests/feature/AdminTest.php` (9 tests, 37 assertions passing).
 - Total automated tests passing: 50 tests, 251 assertions.
+- Completed security hardening: confirmed mass assignment protection (`$allowedFields` on all 17 models), IDOR safeguards on customer endpoints, GD re-encoding and EXIF stripping for image uploads, private storage and authorized streaming for payment proofs, rate limit throttles on auth/upload endpoints, passwordless security with single-use hashed OTP and token family theft revocation.
+- Verified dependencies with `composer audit` (0 security advisories).
+- Completed complete project documentation: `docs/API.md`, `docs/DATABASE.md`, `docs/DEPLOYMENT.md`, `docs/DECISIONS.md`, `docs/curl-examples.md`, and `README.md`.
 
 ---
 
 ## (c) What Is Next
-- **Phase 9: Security Audit & Hardening**
-  - Verify complete Section 8 security checklist:
-    - Mass assignment protection (`$allowedFields` on every model)
-    - IDOR protection across customer endpoints
-    - Upload hardening (MIME validation, GD re-encoding, EXIF stripping, private storage)
-    - Rate limiting (`ThrottleFilter` on auth, payment upload, public endpoints)
-    - Passwordless security (OTP expiration, single use, max 5 attempts, cooldown, JWT revocation on family token theft)
-    - Production error disclosure (404/500 envelope does not leak paths/SQL in prod)
-  - Run `composer audit` and full PHP syntax check `php -l`.
-  - Finalize all project documentation:
-    - `docs/API.md` (complete REST API reference)
-    - `docs/DEPLOYMENT.md` (shared hosting, Apache .htaccess, MySQL 8 migration, crontab for workers)
-    - `docs/DECISIONS.md` (comprehensive architectural decisions)
-    - `README.md` (project overview, requirements, setup, quickstart)
-  - Verify and git commit Phase 9.
+- **Phase 10: Final Review & Double Check**
+  - Execute full test suite `php vendor/bin/phpunit`.
+  - Re-verify live curl smoke tests against `http://localhost:8081`.
+  - Double check database migrations and seeders (`php spark migrate:refresh --all`, `php spark db:seed DatabaseSeeder`).
+  - Git commit Phase 9 and tag release.
+  - Final report for the user.
 
 ---
 
