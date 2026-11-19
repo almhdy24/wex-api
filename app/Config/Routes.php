@@ -67,6 +67,20 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->get('brands/(:num)', 'Admin\BrandAdminController::show/$1');
         $routes->patch('brands/(:num)', 'Admin\BrandAdminController::update/$1');
         $routes->delete('brands/(:num)', 'Admin\BrandAdminController::delete/$1');
+
+        // Settings & Operational Configuration
+        $routes->get('settings', 'Admin\SettingAdminController::index');
+        $routes->patch('settings', 'Admin\SettingAdminController::update');
+
+        // Exchange Rates (AED -> SDG)
+        $routes->get('rates', 'Admin\RateAdminController::index');
+        $routes->post('rates', 'Admin\RateAdminController::update');
+
+        // Shipping Zones
+        $routes->get('shipping-zones', 'Admin\ShippingZoneAdminController::index');
+        $routes->post('shipping-zones', 'Admin\ShippingZoneAdminController::create');
+        $routes->patch('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::update/$1');
+        $routes->delete('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::delete/$1');
     });
 });
 

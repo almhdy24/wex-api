@@ -167,4 +167,12 @@ abstract class BaseApiController extends BaseController
         // AuthFilter sets 'auth_user' on the request
         return $this->request->auth_user ?? null;
     }
+
+    /**
+     * Alias for getCurrentUser()
+     */
+    protected function currentUser(): mixed
+    {
+        return $this->getCurrentUser();
+    }
 }

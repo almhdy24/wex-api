@@ -43,11 +43,12 @@
   - ImageService: multi-upload, GD re-encoding (EXIF stripping), thumbnail generation
   - Admin CRUD: products, accessories linking, images management
   - Unit/Feature tests for Catalog (6 tests, 30 assertions passing)
-- [ ] **Phase 5: Settings, Pricing & Shipping**
-  - SettingsService & ExchangeRate tracking
+- [x] **Phase 5: Settings, Pricing & Shipping**
+  - SettingsService & ExchangeRate tracking with historical logging
   - ShippingZones CRUD & public listing (18 Sudan states)
   - PricingService: central integer math, exchange rate conversion, discount, rounding step
-  - Unit tests for PricingService
+  - Unit tests for PricingService (4 tests, 16 assertions)
+  - Feature tests for Settings, Rates, and Shipping Zones (5 tests, 39 assertions)
 - [ ] **Phase 6: Order Processing & Payment Proofs**
   - OrderService & atomic stock reservation in DB transactions
   - OrderStateMachine (defined valid transitions)
@@ -116,22 +117,33 @@
 - Implemented admin management controllers: `ProductAdminController`, `ProductImageAdminController`, `CategoryAdminController`, `BrandAdminController`.
 - Configured routes in `app/Config/Routes.php` and updated `permittedURIChars` in `app/Config/App.php` for Arabic slugs.
 - Added comprehensive automated feature tests in `tests/feature/CatalogTest.php` (6 tests, 30 assertions passing).
+- Implemented `SettingService` for shop info, whitelisted admin configuration updates, and historical rate audits.
+- Implemented `AuditLogService` for recording administrative actions in `audit_logs`.
+- Implemented `SettingAdminController`, `RateAdminController`, and `ShippingZoneAdminController`.
+- Implemented `tests/unit/PricingServiceTest.php` covering integer currency conversions, ceil rounding steps, and order breakdowns (4 tests, 16 assertions).
+- Implemented `tests/feature/SettingsTest.php` covering settings view/update, rate change audit trail, and shipping zone CRUD (5 tests, 39 assertions).
+- Total automated tests passing: 28 tests, 146 assertions.
 - Updated curl documentation in `docs/curl-examples.md`.
 
 ---
 
 ## (c) What Is Next
-- **Phase 5: Settings, Pricing & Shipping**
-  - Implement `SettingService`:
-    - Public shop settings + internal settings management
-    - Whitelist validation for settings updates
-    - `updateExchangeRate(rate_sdg, userId)`: updates setting, logs historical rate in `exchange_rates`, and writes to `audit_logs`
-  - Implement Admin controllers:
-    - `RateAdminController`: update rate, view rate history with pagination
-    - `SettingAdminController`: get all settings, update settings
-    - `ShippingZoneAdminController`: create, update, delete shipping zones, toggle active
-  - Write unit and feature tests for PricingService and Settings / Rates endpoints (`tests/feature/SettingsTest.php`)
-  - Verify and git commit Phase 5.
+- **Phase 6: Order Processing & Payment Proofs (Critical Core)**
+  - Implement `OrderStateMachine`: state transitions matrix and validations
+    - Valid states: `pending_payment`, `payment_review`, `confirmed`, `ready_for_pickup`, `out_for_delivery`, `completed`, `cancelled`, `expired`
+  - Implement `OrderService`:
+    - `createOrder`: DB transaction, validate products active/in-stock, atomic stock reservation (`UPDATE products SET stock_quantity = stock_quantity - n WHERE id = ? AND stock_quantity >= n`), snapshot rate & prices, calculate totals with `PricingService`, set `lock_expires_at = now + lock_hours`, create `order_events`, return bank transfer details.
+    - `cancelOrder`: only if `pending_payment`, restores stock, adds timeline event.
+    - `reorder`: creates new order from expired/cancelled one at current rate.
+    - `refreshExpiry`: lazy lock check expiring overdue orders on read/proof upload.
+  - Implement `PaymentProofService`:
+    - Secure upload to `writable/uploads/proofs/` via `ImageService`.
+    - Validates order is `pending_payment` and lock has not expired. Transitions order to `payment_review`.
+    - Authorized image stream endpoint `GET /api/v1/orders/{order_number}/payment-proof/{id}/image` (serves image only to order owner or staff/admin).
+  - Implement Admin/Staff order management: status transitions, extend lock, approve/reject payment proof (approve -> `confirmed`; reject -> back to `pending_payment` if lock valid, else `expired` and restore stock).
+  - Implement CLI command `orders:expire`: runs every minute, expires stale orders, restores stock, queues emails/notifications, sends 30-minute reminder.
+  - Create controllers: `OrderController`, `PaymentProofController`, `Admin/OrderAdminController`, `Admin/PaymentAdminController`.
+  - Comprehensive feature tests in `tests/feature/OrderTest.php`. Commit Phase 6.
 
 ---
 

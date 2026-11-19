@@ -196,3 +196,67 @@ curl -i -X POST http://localhost:8081/api/v1/admin/products/1/accessories \
   -d '{"accessory_id": 9}'
 ```
 
+---
+
+## Phase 5: Settings, Pricing & Shipping
+
+### 1. Admin: View All Settings
+```bash
+curl -i http://localhost:8081/api/v1/admin/settings \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>"
+```
+
+### 2. Admin: Update Store Settings
+```bash
+curl -i -X PATCH http://localhost:8081/api/v1/admin/settings \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shop_phone": "+249 912 345 678",
+    "lock_hours": 6,
+    "app_discount_percent": 3,
+    "rounding_step_sdg": 100
+  }'
+```
+
+### 3. Admin: Update Exchange Rate (AED -> SDG)
+```bash
+curl -i -X POST http://localhost:8081/api/v1/admin/rates \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"rate_sdg": 680}'
+```
+
+### 4. Admin: View Exchange Rate History
+```bash
+curl -i "http://localhost:8081/api/v1/admin/rates?page=1&per_page=10" \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>"
+```
+
+### 5. Admin: List All Shipping Zones
+```bash
+curl -i http://localhost:8081/api/v1/admin/shipping-zones \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>"
+```
+
+### 6. Admin: Create New Shipping Zone
+```bash
+curl -i -X POST http://localhost:8081/api/v1/admin/shipping-zones \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state_name_ar": "الولاية الشمالية - دنقلا",
+    "fee_sdg": 15000,
+    "is_active": true
+  }'
+```
+
+### 7. Admin: Update Shipping Zone Fee
+```bash
+curl -i -X PATCH http://localhost:8081/api/v1/admin/shipping-zones/1 \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"fee_sdg": 6000}'
+```
+
+
