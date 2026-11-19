@@ -117,3 +117,82 @@ curl -i -X PATCH http://localhost:8081/api/v1/me/preferences \
 ```bash
 php spark admin:create --email=admin@wextechnology.com --name="مدير المتجر"
 ```
+
+---
+
+## Phase 4: Product Catalog & Image Management
+
+### 1. Get Public Shop Info & Current Exchange Rate
+```bash
+curl -i http://localhost:8081/api/v1/shop
+```
+
+### 2. List Public Categories
+```bash
+curl -i http://localhost:8081/api/v1/categories
+```
+
+### 3. List Public Brands
+```bash
+curl -i http://localhost:8081/api/v1/brands
+```
+
+### 4. List Shipping Zones (Sudan States)
+```bash
+curl -i http://localhost:8081/api/v1/shipping-zones
+```
+
+### 5. Browse Products (Filter, Sort & Paginate)
+```bash
+# Filter laptops under 3000 AED, sort by price low to high
+curl -i "http://localhost:8081/api/v1/products?type=laptop&max_price=3000&sort=price_asc&page=1&per_page=10"
+```
+
+### 6. View Single Product Details & Suggested Accessories
+```bash
+curl -i http://localhost:8081/api/v1/products/dell-latitude-7490
+```
+
+### 7. Admin: Create New Product
+```bash
+curl -i -X POST http://localhost:8081/api/v1/admin/products \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Lenovo ThinkPad T14 Gen 2",
+    "type": "laptop",
+    "category_id": 1,
+    "brand_id": 2,
+    "price_aed": 1450,
+    "condition": "used_imported",
+    "stock_quantity": 4,
+    "short_description": "لابتوب أعمال بمعالج Core i5 الجيل الحادي عشر",
+    "description": "حالة ممتازة وارد الخارج بطارية تدوم طويلاً",
+    "warranty_text": "ضمان فحص وتجربة لمدة شهر كامل",
+    "specs": {
+      "processor": "Intel Core i5-1145G7",
+      "ram": "16GB DDR4",
+      "storage": "512GB NVMe SSD",
+      "screen": "14.0 inch FHD IPS",
+      "battery": "4-5 hours"
+    }
+  }'
+```
+
+### 8. Admin: Upload Product Image
+```bash
+curl -i -X POST http://localhost:8081/api/v1/admin/products/1/images \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -F "image=@/path/to/laptop.jpg" \
+  -F "is_primary=1" \
+  -F "sort_order=0"
+```
+
+### 9. Admin: Link Suggested Accessory
+```bash
+curl -i -X POST http://localhost:8081/api/v1/admin/products/1/accessories \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"accessory_id": 9}'
+```
+

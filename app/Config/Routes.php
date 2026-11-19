@@ -28,6 +28,46 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->patch('preferences', 'MeController::updatePreferences');
         $routes->delete('/', 'MeController::delete');
     });
+
+    // Public Catalog
+    $routes->get('shop', 'SettingsController::shop');
+    $routes->get('categories', 'CategoryController::index');
+    $routes->get('brands', 'BrandController::index');
+    $routes->get('products', 'ProductController::index');
+    $routes->get('products/(:segment)', 'ProductController::show/$1');
+    $routes->get('shipping-zones', 'ShippingZoneController::index');
+
+    // Admin Catalog Management (Auth + Admin Role)
+    $routes->group('admin', ['filter' => ['auth', 'role:admin']], static function (RouteCollection $routes) {
+        // Products CRUD
+        $routes->get('products', 'Admin\ProductAdminController::index');
+        $routes->post('products', 'Admin\ProductAdminController::create');
+        $routes->get('products/(:num)', 'Admin\ProductAdminController::show/$1');
+        $routes->patch('products/(:num)', 'Admin\ProductAdminController::update/$1');
+        $routes->delete('products/(:num)', 'Admin\ProductAdminController::delete/$1');
+        $routes->patch('products/(:num)/stock', 'Admin\ProductAdminController::updateStock/$1');
+        $routes->post('products/(:num)/accessories', 'Admin\ProductAdminController::linkAccessory/$1');
+        $routes->delete('products/(:num)/accessories/(:num)', 'Admin\ProductAdminController::unlinkAccessory/$1/$2');
+
+        // Product Images
+        $routes->post('products/(:num)/images', 'Admin\ProductImageAdminController::upload/$1');
+        $routes->patch('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::update/$1/$2');
+        $routes->delete('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::delete/$1/$2');
+
+        // Categories CRUD
+        $routes->get('categories', 'Admin\CategoryAdminController::index');
+        $routes->post('categories', 'Admin\CategoryAdminController::create');
+        $routes->get('categories/(:num)', 'Admin\CategoryAdminController::show/$1');
+        $routes->patch('categories/(:num)', 'Admin\CategoryAdminController::update/$1');
+        $routes->delete('categories/(:num)', 'Admin\CategoryAdminController::delete/$1');
+
+        // Brands CRUD
+        $routes->get('brands', 'Admin\BrandAdminController::index');
+        $routes->post('brands', 'Admin\BrandAdminController::create');
+        $routes->get('brands/(:num)', 'Admin\BrandAdminController::show/$1');
+        $routes->patch('brands/(:num)', 'Admin\BrandAdminController::update/$1');
+        $routes->delete('brands/(:num)', 'Admin\BrandAdminController::delete/$1');
+    });
 });
 
 // Fallback 404 Override for API JSON envelope

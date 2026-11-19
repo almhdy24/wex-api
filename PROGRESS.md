@@ -37,12 +37,12 @@
   - MeController (profile view/update, Sudan phone validation/normalization, preferences, soft delete)
   - CLI command `admin:create` with option parsing
   - Automated tests passing in `tests/feature/AuthTest.php` (7 tests, 27 assertions)
-- [ ] **Phase 4: Product Catalog & Image Management**
+- [x] **Phase 4: Product Catalog & Image Management**
   - Public endpoints: Categories, Brands, Products listing (filters/search/sort/paginate)
   - Product detail with stock level status, specs, accessories, images
   - ImageService: multi-upload, GD re-encoding (EXIF stripping), thumbnail generation
   - Admin CRUD: products, accessories linking, images management
-  - Unit/Feature tests for Catalog
+  - Unit/Feature tests for Catalog (6 tests, 30 assertions passing)
 - [ ] **Phase 5: Settings, Pricing & Shipping**
   - SettingsService & ExchangeRate tracking
   - ShippingZones CRUD & public listing (18 Sudan states)
@@ -109,24 +109,29 @@
 - Implemented `MeController` (profile show/update, Sudan phone normalization `+249...`, preferences, soft delete).
 - Implemented `admin:create` spark command.
 - Verified end-to-end with curl and PHPUnit (`tests/feature/AuthTest.php` passing 7/7 tests).
+- Implemented `PricingService` with integer money conversions, SDG rounding, order calculations, and snapshot math.
+- Implemented `ImageService` with MIME verification, GD re-encoding (EXIF stripping), thumbnail generation, and private payment proof storage.
+- Implemented `ProductService` with public catalog queries, filtering, sorting, slug generation with soft-delete checks, stock status masking, and accessory links.
+- Implemented public catalog controllers: `ProductController`, `CategoryController`, `BrandController`, `SettingsController` (`GET /shop`), `ShippingZoneController`.
+- Implemented admin management controllers: `ProductAdminController`, `ProductImageAdminController`, `CategoryAdminController`, `BrandAdminController`.
+- Configured routes in `app/Config/Routes.php` and updated `permittedURIChars` in `app/Config/App.php` for Arabic slugs.
+- Added comprehensive automated feature tests in `tests/feature/CatalogTest.php` (6 tests, 30 assertions passing).
+- Updated curl documentation in `docs/curl-examples.md`.
 
 ---
 
 ## (c) What Is Next
-- **Phase 4: Product Catalog & Image Management**
-  - Implement public catalog endpoints:
-    - `GET /api/v1/shop` (public shop info, current exchange rate, lock hours, app discount %)
-    - `GET /api/v1/categories`, `GET /api/v1/brands`
-    - `GET /api/v1/products` (filtering by type, category, brand, condition, price range, search query, featured, in_stock; sorting by price_asc, price_desc, newest; pagination)
-    - `GET /api/v1/products/{slug}` (product detail: images, specs, suggested accessories, stock level status: in_stock/low/out)
-    - `GET /api/v1/shipping-zones`
-  - Implement `ImageService`: upload validation, GD re-encoding (EXIF stripping), resize to max 1600px, 400px thumbnail.
-  - Implement Admin CRUD endpoints (under `Admin/` namespace):
-    - Products CRUD, stock updates, soft-delete.
-    - Images upload, re-order, set primary, delete.
-    - Accessories link/unlink.
-    - Categories & Brands CRUD.
-  - Write feature tests for Catalog & Image management.
+- **Phase 5: Settings, Pricing & Shipping**
+  - Implement `SettingService`:
+    - Public shop settings + internal settings management
+    - Whitelist validation for settings updates
+    - `updateExchangeRate(rate_sdg, userId)`: updates setting, logs historical rate in `exchange_rates`, and writes to `audit_logs`
+  - Implement Admin controllers:
+    - `RateAdminController`: update rate, view rate history with pagination
+    - `SettingAdminController`: get all settings, update settings
+    - `ShippingZoneAdminController`: create, update, delete shipping zones, toggle active
+  - Write unit and feature tests for PricingService and Settings / Rates endpoints (`tests/feature/SettingsTest.php`)
+  - Verify and git commit Phase 5.
 
 ---
 
