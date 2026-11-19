@@ -38,6 +38,7 @@ class OrderService
     protected UserModel $users;
     protected PricingService $pricingService;
     protected SettingService $settingService;
+    protected NotificationService $notificationService;
 
     public function __construct(
         ?OrderModel $orders = null,
@@ -48,17 +49,19 @@ class OrderService
         ?PaymentProofModel $paymentProofs = null,
         ?UserModel $users = null,
         ?PricingService $pricingService = null,
-        ?SettingService $settingService = null
+        ?SettingService $settingService = null,
+        ?NotificationService $notificationService = null
     ) {
-        $this->orders         = $orders ?? new OrderModel();
-        $this->orderItems     = $orderItems ?? new OrderItemModel();
-        $this->orderEvents    = $orderEvents ?? new OrderEventModel();
-        $this->products       = $products ?? new ProductModel();
-        $this->shippingZones  = $shippingZones ?? new ShippingZoneModel();
-        $this->paymentProofs  = $paymentProofs ?? new PaymentProofModel();
-        $this->users          = $users ?? new UserModel();
-        $this->pricingService = $pricingService ?? new PricingService();
-        $this->settingService = $settingService ?? new SettingService();
+        $this->orders              = $orders ?? new OrderModel();
+        $this->orderItems          = $orderItems ?? new OrderItemModel();
+        $this->orderEvents         = $orderEvents ?? new OrderEventModel();
+        $this->products            = $products ?? new ProductModel();
+        $this->shippingZones       = $shippingZones ?? new ShippingZoneModel();
+        $this->paymentProofs       = $paymentProofs ?? new PaymentProofModel();
+        $this->users               = $users ?? new UserModel();
+        $this->pricingService      = $pricingService ?? new PricingService();
+        $this->settingService      = $settingService ?? new SettingService();
+        $this->notificationService = $notificationService ?? new NotificationService();
     }
 
     /**
@@ -246,6 +249,28 @@ class OrderService
             throw $e;
         }
 
+        // Send order created notification
+        try {
+            $this->notificationService->notify(
+                userId: $userId,
+                type: 'order_created',
+                title: 'تم استلام طلبك بنجاح',
+                body: "تم استلام طلبك رقم {$orderNumber} وحجز السعر بالجنيه السوداني.",
+                orderId: (int) $orderId,
+                emailTemplate: 'order_created',
+                emailPayload: [
+                    'order_number'        => $orderNumber,
+                    'delivery_type'       => $orderType,
+                    'total_sdg'           => $totals['total_sdg'],
+                    'lock_expires_at'     => gmdate('Y-m-d H:i', strtotime($lockExpiresAt)) . ' UTC',
+                    'bank_account_name'   => $this->settingService->get('bank_account_name'),
+                    'bank_account_number' => $this->settingService->get('bank_account_number'),
+                ]
+            );
+        } catch (\Throwable $e) {
+            log_message('warning', 'Failed to dispatch order_created notification: {msg}', ['msg' => $e->getMessage()]);
+        }
+
         // Return order detail structure with bank transfer instructions
         return $this->getOrder($orderNumber, $userId);
     }
@@ -295,6 +320,24 @@ class OrderService
 
             $order->status = Wex::ORDER_STATUS_EXPIRED;
             $order->updated_at = $nowStr;
+
+            // Send notification for expired order
+            try {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'order_expired',
+                    title: 'انتهاء فترة حجز السعر للطلب',
+                    body: "تم إلغاء الطلب رقم {$order->order_number} لانتهاء فترة حجز السعر المحددة.",
+                    orderId: (int) $order->id,
+                    emailTemplate: 'order_expired',
+                    emailPayload: [
+                        'order_number' => $order->order_number,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                log_message('warning', 'Failed to dispatch order_expired notification: {msg}', ['msg' => $e->getMessage()]);
+            }
+
             return true;
         }
 
@@ -717,6 +760,68 @@ class OrderService
         } catch (\Throwable $e) {
             $db->transRollback();
             throw $e;
+        }
+
+        // Send status change notification
+        try {
+            if ($newStatus === Wex::ORDER_STATUS_CONFIRMED) {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'order_confirmed',
+                    title: 'تم تأكيد طلبك بنجاح',
+                    body: "تم تأكيد طلبك رقم {$orderNumber} وجاري تجهيزه.",
+                    orderId: (int) $order->id,
+                    emailTemplate: 'payment_approved',
+                    emailPayload: [
+                        'order_number'  => $orderNumber,
+                        'total_sdg'     => (int) $order->total_sdg,
+                        'delivery_type' => $order->delivery_type,
+                    ]
+                );
+            } elseif ($newStatus === Wex::ORDER_STATUS_READY_FOR_PICKUP) {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'order_ready_pickup',
+                    title: 'طلبك جاهز للاستلام من المحل',
+                    body: "طلبك رقم {$orderNumber} جاهز الآن للاستلام من فرع أم درمان.",
+                    orderId: (int) $order->id,
+                    emailTemplate: 'ready_for_pickup',
+                    emailPayload: [
+                        'order_number' => $orderNumber,
+                        'shop_phone'   => $this->settingService->get('shop_phone'),
+                    ]
+                );
+            } elseif ($newStatus === Wex::ORDER_STATUS_OUT_FOR_DELIVERY) {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'order_out_delivery',
+                    title: 'طلبك في الطريق إليك مع المندوب',
+                    body: "طلبك رقم {$orderNumber} خرج مع مندوب التوصيل.",
+                    orderId: (int) $order->id,
+                    emailTemplate: 'out_for_delivery',
+                    emailPayload: [
+                        'order_number'     => $orderNumber,
+                        'courier_name'     => $updateData['courier_name'] ?? null,
+                        'courier_phone'    => $updateData['courier_phone'] ?? null,
+                        'delivery_address' => $order->delivery_address,
+                    ]
+                );
+            } elseif ($newStatus === Wex::ORDER_STATUS_COMPLETED) {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'order_completed',
+                    title: 'تم تسليم طلبك بنجاح',
+                    body: "تم تسليم طلبك رقم {$orderNumber} بنجاح. شكراً لثقتك في ويكس تكنولوجي.",
+                    orderId: (int) $order->id,
+                    emailTemplate: 'order_completed',
+                    emailPayload: [
+                        'order_number' => $orderNumber,
+                        'total_sdg'    => (int) $order->total_sdg,
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            log_message('warning', 'Failed to dispatch status update notification: {msg}', ['msg' => $e->getMessage()]);
         }
 
         return $this->getOrder($orderNumber, null, true);

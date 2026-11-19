@@ -383,5 +383,39 @@ curl -i -X POST http://localhost:8081/api/v1/admin/orders/WEX-261119-C59ED/lock 
 php spark orders:expire
 ```
 
+---
+
+## Phase 7: Notifications & Email Outbox
+
+### 1. Get Unread Notifications Badge Count
+```bash
+curl -i http://localhost:8081/api/v1/notifications/unread-count \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 2. List In-App Notifications
+```bash
+curl -i "http://localhost:8081/api/v1/notifications?page=1&per_page=10" \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 3. Mark Single Notification as Read
+```bash
+curl -i -X PATCH http://localhost:8081/api/v1/notifications/1/read \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 4. Mark All Notifications as Read
+```bash
+curl -i -X POST http://localhost:8081/api/v1/notifications/mark-all-read \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 5. CLI Command: Process Email Outbox Queue
+```bash
+php spark mail:send --batch=20
+```
+
+
 
 

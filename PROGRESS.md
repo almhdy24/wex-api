@@ -58,12 +58,13 @@
   - Admin/Staff order management & payment proof review (approve/reject)
   - CLI command `orders:expire`
   - Automated feature tests in `tests/feature/OrderTest.php` (9 tests, 45 assertions)
-- [ ] **Phase 7: Notifications & Email Outbox**
-  - In-app notification system (unread count, mark read, list)
-  - Email outbox pattern & worker command `mail:send` (retry backoff)
-  - Arabic RTL HTML email templates (Wex colors, email-safe fonts)
-  - User notification preferences support
-  - Tests for notifications & outbox
+- [x] **Phase 7: Notifications & Email Outbox**
+  - In-app notification system (unread count, mark read, mark all read, list)
+  - Email outbox pattern (`email_outbox` table, exponential backoff retries)
+  - Worker command `php spark mail:send`
+  - Arabic RTL HTML email templates (all 9 order event templates with Wex branding)
+  - User notification preferences respect (no email enqueued if `email_notifications = 0`)
+  - Automated feature tests in `tests/feature/NotificationTest.php` (4 tests, 23 assertions)
 - [ ] **Phase 8: Admin Management & Audit Logs**
   - Admin dashboard stats (order counts, pending proofs, today sales, low stock)
   - User management (role changes, active status)
@@ -130,34 +131,35 @@
 - Implemented `OrderController`, `PaymentProofController`, `OrderAdminController`, and `PaymentAdminController`.
 - Implemented CLI command `orders:expire` (`php spark orders:expire`) for cron-based cleanup of overdue price-locked orders.
 - Added comprehensive feature tests in `tests/feature/OrderTest.php` (9 tests, 45 assertions passing).
-- Total automated tests passing: 37 tests, 191 assertions.
+- Implemented `NotificationService` and `NotificationController` with badge unread counter, single mark-read, mark-all-read, and pagination.
+- Implemented `MailService::enqueue()` and `MailService::processOutbox()` with exponential backoff retry scheduling.
+- Built 9 Arabic RTL HTML email templates matching Wex design standards (order created, lock warning, payment received, payment approved, payment rejected, ready for pickup, out for delivery, completed, expired).
+- Implemented Spark CLI worker command `mail:send` (`php spark mail:send [--batch=20]`).
+- Connected order and payment lifecycle events to in-app notifications and email outbox dispatching, respecting user notification preferences.
+- Added comprehensive automated feature tests in `tests/feature/NotificationTest.php` (4 tests, 23 assertions passing).
+- Total automated tests passing: 41 tests, 214 assertions.
 - Updated curl documentation in `docs/curl-examples.md`.
 
 ---
 
 ## (c) What Is Next
-- **Phase 7: Notifications & Email Outbox**
-  - Implement in-app notifications system (`NotificationService`, `NotificationController`):
-    - `GET /api/v1/notifications`: list notifications with pagination
-    - `GET /api/v1/notifications/unread-count`: quick badge counter
-    - `PATCH /api/v1/notifications/{id}/read`: mark single notification read
-    - `POST /api/v1/notifications/mark-all-read`: mark all notifications read
-  - Implement Email Outbox pattern:
-    - `MailService::enqueue()` writes to `email_outbox` table with status `pending`, retry attempts, and exponential backoff
-    - Spark worker command `mail:send`: processes batch of up to 20 emails, updates status to `sent` or `failed`
-  - Arabic RTL HTML email templates in `app/Views/emails/`:
-    - `order_created.php`: order summary, price lock timer, Bankak transfer account details
-    - `lock_warning.php`: reminder when 30 minutes remain before expiry
-    - `payment_received.php`: confirmation of receipt upload under review
-    - `payment_approved.php`: confirmation that payment was verified
-    - `payment_rejected.php`: explanation of rejection and instructions
-    - `ready_for_pickup.php`: notification that order is ready at Omdurman store
-    - `out_for_delivery.php`: courier name, phone, and delivery tracking notice
-    - `order_completed.php`: thank you and receipt
-    - `order_expired.php`: notice of cancellation due to lock expiry
-  - Wire notifications & email dispatch into `OrderService` and `PaymentProofService` events
-  - Automated tests in `tests/feature/NotificationTest.php`
-  - Verify and git commit Phase 7.
+- **Phase 8: Admin Dashboard, Users & Audit Logs**
+  - Implement `DashboardController`:
+    - `GET /api/v1/admin/dashboard`:
+      - Orders overview (counts by status: pending_payment, payment_review, confirmed, etc.)
+      - Financial breakdown (today's orders count and revenue in SDG)
+      - Pending payment reviews count (requires staff attention)
+      - Inventory alerts: products with stock <= `low_stock_threshold`
+      - Current exchange rate and lock hours
+  - Implement `UserAdminController`:
+    - `GET /api/v1/admin/users`: list/search users with pagination and role filter
+    - `GET /api/v1/admin/users/{id}`: view user profile, orders count, total spent
+    - `PATCH /api/v1/admin/users/{id}/role`: promote/demote (customer, staff, admin)
+    - `PATCH /api/v1/admin/users/{id}/status`: activate / deactivate user account
+  - Implement Audit Log viewer:
+    - `GET /api/v1/admin/audit-logs`: list historical audit actions with pagination, user, and action filters
+  - Feature tests in `tests/feature/AdminTest.php`
+  - Verify and git commit Phase 8.
 
 ---
 

@@ -104,7 +104,7 @@
             <div class="subtitle">مول الواحة، الشهداء، أم درمان</div>
         </div>
         <div class="content">
-            <?= $content ?? '' ?>
+            <?= $this->renderSection('content') ?: ($content ?? '') ?>
         </div>
         <div class="footer">
             <p>ويكس تكنولوجي (Wex Technology) - أم درمان، السودان</p>

@@ -28,19 +28,22 @@ class PaymentProofService
     protected OrderEventModel $orderEvents;
     protected OrderService $orderService;
     protected ImageService $imageService;
+    protected NotificationService $notificationService;
 
     public function __construct(
         ?PaymentProofModel $paymentProofs = null,
         ?OrderModel $orders = null,
         ?OrderEventModel $orderEvents = null,
         ?OrderService $orderService = null,
-        ?ImageService $imageService = null
+        ?ImageService $imageService = null,
+        ?NotificationService $notificationService = null
     ) {
-        $this->paymentProofs = $paymentProofs ?? new PaymentProofModel();
-        $this->orders        = $orders ?? new OrderModel();
-        $this->orderEvents   = $orderEvents ?? new OrderEventModel();
-        $this->orderService  = $orderService ?? new OrderService();
-        $this->imageService  = $imageService ?? new ImageService();
+        $this->paymentProofs       = $paymentProofs ?? new PaymentProofModel();
+        $this->orders              = $orders ?? new OrderModel();
+        $this->orderEvents         = $orderEvents ?? new OrderEventModel();
+        $this->orderService        = $orderService ?? new OrderService();
+        $this->imageService        = $imageService ?? new ImageService();
+        $this->notificationService = $notificationService ?? new NotificationService();
     }
 
     /**
@@ -137,6 +140,21 @@ class PaymentProofService
         } catch (\Throwable $e) {
             $db->transRollback();
             throw $e;
+        }
+
+        // Notify customer that proof was received and is under review
+        try {
+            $this->notificationService->notify(
+                userId: $userId,
+                type: 'payment_proof_uploaded',
+                title: 'تم استلام إشعار التحويل البنكي',
+                body: "تم استلام إشعار التحويل للطلب رقم {$orderNumber} وجاري مراجعته وتأكيده.",
+                orderId: (int) $order->id,
+                emailTemplate: 'payment_received',
+                emailPayload: ['order_number' => $orderNumber]
+            );
+        } catch (\Throwable $e) {
+            log_message('warning', 'Failed to dispatch payment_proof_uploaded notification: {msg}', ['msg' => $e->getMessage()]);
         }
 
         return [
@@ -341,6 +359,40 @@ class PaymentProofService
         } catch (\Throwable $e) {
             $db->transRollback();
             throw $e;
+        }
+
+        // Send review notification
+        try {
+            if ($action === 'approve') {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'payment_approved',
+                    title: 'تم تأكيد دفع الطلب بنجاح',
+                    body: "تمت مراجعة التحويل البنكي وتأكيد طلبك رقم {$orderNumber}.",
+                    orderId: (int) $order->id,
+                    emailTemplate: 'payment_approved',
+                    emailPayload: [
+                        'order_number'  => $orderNumber,
+                        'total_sdg'     => (int) $order->total_sdg,
+                        'delivery_type' => $order->delivery_type,
+                    ]
+                );
+            } else {
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'payment_rejected',
+                    title: 'تعذر تأكيد إشعار التحويل البنكي',
+                    body: "تم رفض إشعار التحويل للطلب رقم {$orderNumber}." . ($reviewNote ? " السبب: {$reviewNote}" : ''),
+                    orderId: (int) $order->id,
+                    emailTemplate: 'payment_rejected',
+                    emailPayload: [
+                        'order_number' => $orderNumber,
+                        'reason'       => $reviewNote,
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {
+            log_message('warning', 'Failed to dispatch payment review notification: {msg}', ['msg' => $e->getMessage()]);
         }
 
         return $this->orderService->getOrder($orderNumber, null, true);

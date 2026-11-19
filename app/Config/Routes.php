@@ -40,6 +40,14 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->get('(:segment)/payment-proof/(:num)/image', 'PaymentProofController::streamImage/$1/$2');
     });
 
+    // In-App Notifications (Authenticated)
+    $routes->group('notifications', ['filter' => 'auth'], static function (RouteCollection $routes) {
+        $routes->get('/', 'NotificationController::index');
+        $routes->get('unread-count', 'NotificationController::unreadCount');
+        $routes->patch('(:num)/read', 'NotificationController::markRead/$1');
+        $routes->post('mark-all-read', 'NotificationController::markAllRead');
+    });
+
     // Public Catalog
     $routes->get('shop', 'SettingsController::shop');
     $routes->get('categories', 'CategoryController::index');
