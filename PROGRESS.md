@@ -19,11 +19,13 @@
   - Base routes skeleton + `GET /api/v1/ping` smoke test
   - 404 route handling with standard Arabic JSON error
   - Tests passing in `tests/feature/PingTest.php`
-- [ ] **Phase 2: Database Layer**
-  - 17 Migrations with foreign keys, indexes, and MySQL/SQLite portability
-  - Models & Entities with casting (JSON, integers, booleans, dates)
-  - Seeders: Settings, ShippingZones, Categories, Brands, Products, Admin
-  - Verification with `php spark migrate`, `php spark migrate:refresh --all`, and `php spark db:seed`
+- [x] **Phase 2: Database Layer**
+  - 18 Migrations with foreign keys, indexes, and full MySQL/SQLite portability
+  - Models & Entities with type casting (JSON specs/payload, booleans, integer money, dates)
+  - Seeders: Settings, ShippingZones, Categories, Brands, Products, Admin, DatabaseSeeder
+  - Verification: `php spark migrate`, `php spark migrate:refresh --all`, and `php spark db:seed DatabaseSeeder`
+  - Automated tests passing in `tests/feature/DatabaseTest.php`
+  - Complete schema documentation in `docs/DATABASE.md`
 - [ ] **Phase 3: Authentication & User Management**
   - TokenService (JWT HS256 access tokens + rotating refresh token family)
   - OtpService (HMAC-SHA256 hashed 6-digit codes, rate-limiting, attempt count)
@@ -79,7 +81,7 @@
 - Installed `firebase/php-jwt` (^7.2) for JWT management and Google JWKS verification.
 - Configured `.gitignore` to protect sensitive files, uploads, logs, and database files.
 - Configured `app/Config/Database.php` with SQLite defaults, `foreignKeys = true`, and path resolution.
-- Configured `phpunit.dist.xml` with in-memory SQLite and test environment variables.
+- Configured `phpunit.dist.xml` with test SQLite database and environment variables.
 - Created `app/Config/Wex.php` containing all application constants (roles, product types, order statuses, Sudan states, default settings).
 - Created `.env` and fully documented `.env.example`.
 - Created directory structure for all services, controllers, entities, exceptions, and documentation.
@@ -90,15 +92,27 @@
 - Added Arabic and English translation dictionaries (`app/Language/ar/Api.php`, `app/Language/en/Api.php`).
 - Implemented `PingController` and verified `GET /api/v1/ping`, CORS preflight, and 404 routing with curl and PHPUnit.
 - Saved working curl commands in `docs/curl-examples.md`.
+- Implemented all 18 database migrations using Forge with integer money, no ENUMs, and portable schema.
+- Implemented 18 Entities with automatic casting (booleans, JSON specs/details/payload, integer currencies, dates).
+- Implemented 17 Models with mass-assignment protection (`$allowedFields`) and timestamps.
+- Implemented Seeders: Settings, ShippingZones (18 Sudan states), Categories, Brands, Products (8 laptops + 6 accessories linked), Admin.
+- Verified database rollback and re-migration with `php spark migrate:refresh --all` and seeding with `php spark db:seed DatabaseSeeder`.
+- Created schema architecture document in `docs/DATABASE.md`.
+- Automated test `tests/feature/DatabaseTest.php` passing with 18 assertions.
 
 ---
 
 ## (c) What Is Next
-- **Phase 2: Database Layer**
-  - Implement 17 Forge migrations with foreign keys, indexes, and portability between SQLite and MySQL.
-  - Implement Models and Entities with casting.
-  - Implement Seeders (Settings, ShippingZones, Categories, Brands, Products, Admin).
-  - Verify `php spark migrate`, `php spark migrate:refresh --all`, and `php spark db:seed`.
+- **Phase 3: Authentication & User Management**
+  - Implement `TokenService` (JWT HS256 access tokens + rotating refresh token family with theft detection).
+  - Implement `OtpService` (HMAC-SHA256 hashed 6-digit codes, rate limiting, attempts tracking, single use).
+  - Implement `GoogleAuthService` (Google ID token verification against JWKS with caching).
+  - Implement `MailService` with `log` driver for local development.
+  - Implement `AuthService` and `AuthController` (Google sign-in, email request, verify, refresh, logout, logout-all).
+  - Implement `AuthFilter` and `RoleFilter` (staff/admin checks).
+  - Implement `MeController` (profile view/update, Sudan phone validation, preferences, soft delete).
+  - Implement CLI command `admin:create`.
+  - Feature tests for authentication flows.
 
 ---
 

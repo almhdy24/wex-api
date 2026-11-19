@@ -98,13 +98,15 @@ class Database extends Config
             $this->defaultGroup = 'tests';
         }
 
-        // When SQLite is used for default connection, ensure relative database paths
+        // When SQLite is used, ensure relative database paths
         // resolve safely to writable/database/
-        if ($this->default['DBDriver'] === 'SQLite3') {
-            $dbPath = $this->default['database'];
-            if ($dbPath !== ':memory:' && !str_starts_with($dbPath, '/')) {
-                $clean = basename($dbPath);
-                $this->default['database'] = WRITEPATH . 'database/' . $clean;
+        foreach (['default', 'tests'] as $group) {
+            if ($this->{$group}['DBDriver'] === 'SQLite3') {
+                $dbPath = $this->{$group}['database'];
+                if ($dbPath !== ':memory:' && !str_starts_with($dbPath, '/')) {
+                    $clean = basename($dbPath);
+                    $this->{$group}['database'] = WRITEPATH . 'database/' . $clean;
+                }
             }
         }
     }
