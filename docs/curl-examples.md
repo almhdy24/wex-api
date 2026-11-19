@@ -416,6 +416,91 @@ curl -i -X POST http://localhost:8081/api/v1/notifications/mark-all-read \
 php spark mail:send --batch=20
 ```
 
+---
+
+## Phase 8: Admin Dashboard, Users & Audit Logs
+
+### 1. Operational Dashboard
+```bash
+curl -i http://localhost:8081/api/v1/admin/dashboard \
+  -H "Authorization: Bearer <ADMIN_OR_STAFF_ACCESS_TOKEN>"
+```
+
+**Expected Response (200 OK):**
+```json
+{
+    "success": true,
+    "message": "تم استرجاع لوحة التحكم بنجاح",
+    "data": {
+        "orders_by_status": {
+            "pending_payment": 2,
+            "payment_review": 1,
+            "confirmed": 3,
+            "processing": 1,
+            "ready_for_pickup": 0,
+            "out_for_delivery": 0,
+            "completed": 12,
+            "cancelled": 1,
+            "expired": 2
+        },
+        "pending_payment_reviews": 1,
+        "today_stats": {
+            "order_count": 3,
+            "revenue_sdg": 1850000
+        },
+        "low_stock_products": [
+            {
+                "id": 4,
+                "name": "Lenovo Legion 5 15IAH7",
+                "stock_quantity": 2
+            }
+        ],
+        "pricing_info": {
+            "current_exchange_rate": 830,
+            "price_lock_hours": 4,
+            "rate_updated_at": "2026-11-19T14:00:00Z"
+        }
+    },
+    "errors": null,
+    "meta": null
+}
+```
+
+### 2. List Users (Admin only)
+```bash
+curl -i "http://localhost:8081/api/v1/admin/users?page=1&per_page=20&role=customer" \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>"
+```
+
+### 3. Get User Details & Spending Summary (Admin only)
+```bash
+curl -i http://localhost:8081/api/v1/admin/users/2 \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>"
+```
+
+### 4. Update User Role (Admin only)
+```bash
+curl -i -X PATCH http://localhost:8081/api/v1/admin/users/2/role \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"role": "staff"}'
+```
+
+### 5. Update User Status (Activate/Deactivate) (Admin only)
+```bash
+curl -i -X PATCH http://localhost:8081/api/v1/admin/users/2/status \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active": false}'
+```
+
+### 6. View Audit Logs (Admin only)
+```bash
+curl -i "http://localhost:8081/api/v1/admin/audit-logs?page=1&per_page=20&action=user.role_change" \
+  -H "Authorization: Bearer <ADMIN_ACCESS_TOKEN>"
+```
+
+
 
 
 

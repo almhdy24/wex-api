@@ -58,6 +58,9 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
 
     // Admin & Staff Operations (Auth + Role Filter)
     $routes->group('admin', ['filter' => ['auth', 'role:admin,staff']], static function (RouteCollection $routes) {
+        // Operational Dashboard (Admin & Staff)
+        $routes->get('dashboard', 'Admin\DashboardController::index');
+
         // Orders & Payment Reviews (Staff & Admin)
         $routes->get('orders', 'Admin\OrderAdminController::index');
         $routes->get('orders/(:segment)', 'Admin\OrderAdminController::show/$1');
@@ -107,6 +110,15 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->post('shipping-zones', 'Admin\ShippingZoneAdminController::create', ['filter' => 'role:admin']);
         $routes->patch('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::update/$1', ['filter' => 'role:admin']);
         $routes->delete('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::delete/$1', ['filter' => 'role:admin']);
+
+        // User Management (Admin only)
+        $routes->get('users', 'Admin\UserAdminController::index', ['filter' => 'role:admin']);
+        $routes->get('users/(:num)', 'Admin\UserAdminController::show/$1', ['filter' => 'role:admin']);
+        $routes->patch('users/(:num)/role', 'Admin\UserAdminController::updateRole/$1', ['filter' => 'role:admin']);
+        $routes->patch('users/(:num)/status', 'Admin\UserAdminController::updateStatus/$1', ['filter' => 'role:admin']);
+
+        // Audit Logs (Admin only)
+        $routes->get('audit-logs', 'Admin\AuditAdminController::index', ['filter' => 'role:admin']);
     });
 });
 

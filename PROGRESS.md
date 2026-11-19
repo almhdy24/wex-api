@@ -65,10 +65,11 @@
   - Arabic RTL HTML email templates (all 9 order event templates with Wex branding)
   - User notification preferences respect (no email enqueued if `email_notifications = 0`)
   - Automated feature tests in `tests/feature/NotificationTest.php` (4 tests, 23 assertions)
-- [ ] **Phase 8: Admin Management & Audit Logs**
+- [x] **Phase 8: Admin Management & Audit Logs**
   - Admin dashboard stats (order counts, pending proofs, today sales, low stock)
-  - User management (role changes, active status)
+  - User management (role changes, active status, spending totals)
   - Audit logging service & viewer endpoint
+  - Automated tests passing in `tests/feature/AdminTest.php` (9 tests, 37 assertions)
 - [ ] **Phase 9: Security Audit & Hardening**
   - Complete security checklist verification
   - Input validation review & rate limit testing
@@ -139,27 +140,30 @@
 - Added comprehensive automated feature tests in `tests/feature/NotificationTest.php` (4 tests, 23 assertions passing).
 - Total automated tests passing: 41 tests, 214 assertions.
 - Updated curl documentation in `docs/curl-examples.md`.
+- Implemented `DashboardController` (`GET /api/v1/admin/dashboard`) returning order statuses breakdown, pending payment review counts, today's order count & revenue in SDG, low-stock alerts, and pricing/rate info.
+- Implemented `UserAdminController` (`GET /api/v1/admin/users`, `GET /api/v1/admin/users/{id}`, `PATCH /api/v1/admin/users/{id}/role`, `PATCH /api/v1/admin/users/{id}/status`) with self-modification safeguards (cannot alter own role or deactivate self).
+- Implemented `AuditAdminController` (`GET /api/v1/admin/audit-logs`) with filtering by action, user ID, entity name, and date range.
+- Added comprehensive automated feature tests in `tests/feature/AdminTest.php` (9 tests, 37 assertions passing).
+- Total automated tests passing: 50 tests, 251 assertions.
 
 ---
 
 ## (c) What Is Next
-- **Phase 8: Admin Dashboard, Users & Audit Logs**
-  - Implement `DashboardController`:
-    - `GET /api/v1/admin/dashboard`:
-      - Orders overview (counts by status: pending_payment, payment_review, confirmed, etc.)
-      - Financial breakdown (today's orders count and revenue in SDG)
-      - Pending payment reviews count (requires staff attention)
-      - Inventory alerts: products with stock <= `low_stock_threshold`
-      - Current exchange rate and lock hours
-  - Implement `UserAdminController`:
-    - `GET /api/v1/admin/users`: list/search users with pagination and role filter
-    - `GET /api/v1/admin/users/{id}`: view user profile, orders count, total spent
-    - `PATCH /api/v1/admin/users/{id}/role`: promote/demote (customer, staff, admin)
-    - `PATCH /api/v1/admin/users/{id}/status`: activate / deactivate user account
-  - Implement Audit Log viewer:
-    - `GET /api/v1/admin/audit-logs`: list historical audit actions with pagination, user, and action filters
-  - Feature tests in `tests/feature/AdminTest.php`
-  - Verify and git commit Phase 8.
+- **Phase 9: Security Audit & Hardening**
+  - Verify complete Section 8 security checklist:
+    - Mass assignment protection (`$allowedFields` on every model)
+    - IDOR protection across customer endpoints
+    - Upload hardening (MIME validation, GD re-encoding, EXIF stripping, private storage)
+    - Rate limiting (`ThrottleFilter` on auth, payment upload, public endpoints)
+    - Passwordless security (OTP expiration, single use, max 5 attempts, cooldown, JWT revocation on family token theft)
+    - Production error disclosure (404/500 envelope does not leak paths/SQL in prod)
+  - Run `composer audit` and full PHP syntax check `php -l`.
+  - Finalize all project documentation:
+    - `docs/API.md` (complete REST API reference)
+    - `docs/DEPLOYMENT.md` (shared hosting, Apache .htaccess, MySQL 8 migration, crontab for workers)
+    - `docs/DECISIONS.md` (comprehensive architectural decisions)
+    - `README.md` (project overview, requirements, setup, quickstart)
+  - Verify and git commit Phase 9.
 
 ---
 
