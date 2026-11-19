@@ -10,13 +10,15 @@
   - Application configuration (`app/Config/Wex.php`)
   - Environment files (`.env`, `.env.example`)
   - Initial documentation (`README.md`, `PROGRESS.md`, `docs/DECISIONS.md`)
-- [ ] **Phase 1: Core Infrastructure**
+- [x] **Phase 1: Core Infrastructure**
   - Standard JSON ApiResponse library + BaseApiController
   - Custom ApiException classes + Global Exception Handler (RFC/JSON envelope for all errors including 404/405)
   - Filters: CorsFilter, SecurityHeadersFilter, ThrottleFilter, ForceHttpsFilter
   - Request ID tracing (`X-Request-Id`)
-  - Arabic localization (`app/Language/ar/Api.php`)
+  - Arabic localization (`app/Language/ar/Api.php`) + English fallback (`app/Language/en/Api.php`)
   - Base routes skeleton + `GET /api/v1/ping` smoke test
+  - 404 route handling with standard Arabic JSON error
+  - Tests passing in `tests/feature/PingTest.php`
 - [ ] **Phase 2: Database Layer**
   - 17 Migrations with foreign keys, indexes, and MySQL/SQLite portability
   - Models & Entities with casting (JSON, integers, booleans, dates)
@@ -82,16 +84,21 @@
 - Created `.env` and fully documented `.env.example`.
 - Created directory structure for all services, controllers, entities, exceptions, and documentation.
 - Created `docs/DECISIONS.md`.
+- Implemented `ApiResponse` formatter and `BaseApiController`.
+- Created custom `ApiException` hierarchy and `ApiExceptionHandler` returning Arabic JSON envelopes.
+- Created security filters: `CorsFilter`, `SecurityHeadersFilter`, `ThrottleFilter`, `ForceHttpsFilter`.
+- Added Arabic and English translation dictionaries (`app/Language/ar/Api.php`, `app/Language/en/Api.php`).
+- Implemented `PingController` and verified `GET /api/v1/ping`, CORS preflight, and 404 routing with curl and PHPUnit.
+- Saved working curl commands in `docs/curl-examples.md`.
 
 ---
 
 ## (c) What Is Next
-- **Phase 1: Core Infrastructure**
-  - Create ApiResponse library and BaseApiController.
-  - Implement custom ApiException classes and register Global Exception Handler.
-  - Implement CorsFilter, SecurityHeadersFilter, ThrottleFilter, ForceHttpsFilter.
-  - Implement Arabic language strings in `app/Language/ar/Api.php`.
-  - Configure routes and verify `GET /api/v1/ping`.
+- **Phase 2: Database Layer**
+  - Implement 17 Forge migrations with foreign keys, indexes, and portability between SQLite and MySQL.
+  - Implement Models and Entities with casting.
+  - Implement Seeders (Settings, ShippingZones, Categories, Brands, Products, Admin).
+  - Verify `php spark migrate`, `php spark migrate:refresh --all`, and `php spark db:seed`.
 
 ---
 
