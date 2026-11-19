@@ -38,7 +38,11 @@ class ThrottleFilter implements FilterInterface
                 $retryAfter = 60;
             }
 
-            throw new TooManyRequestsException($retryAfter);
+            return Services::response()
+                ->setStatusCode(429)
+                ->setHeader('Retry-After', (string) $retryAfter)
+                ->setHeader('Content-Type', 'application/json; charset=UTF-8')
+                ->setJSON(\App\Libraries\ApiResponse::format(false, lang('Api.too_many_requests')));
         }
 
         return null;

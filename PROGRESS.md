@@ -26,15 +26,17 @@
   - Verification: `php spark migrate`, `php spark migrate:refresh --all`, and `php spark db:seed DatabaseSeeder`
   - Automated tests passing in `tests/feature/DatabaseTest.php`
   - Complete schema documentation in `docs/DATABASE.md`
-- [ ] **Phase 3: Authentication & User Management**
-  - TokenService (JWT HS256 access tokens + rotating refresh token family)
-  - OtpService (HMAC-SHA256 hashed 6-digit codes, rate-limiting, attempt count)
-  - GoogleAuthService (JWKS caching, token verification)
-  - AuthService & AuthController (Google sign-in, email OTP request/verify, refresh, logout)
-  - AuthFilter & RoleFilter
-  - MeController (profile, Sudan phone validation, preferences, account soft-delete)
-  - CLI command `admin:create`
-  - Unit/Feature tests for Auth
+- [x] **Phase 3: Authentication & User Management**
+  - TokenService (JWT HS256 access tokens + rotating refresh token family with theft detection)
+  - OtpService (HMAC-SHA256 hashed 6-digit codes, attempt counts, cooldown, single use)
+  - GoogleAuthService (JWKS caching, token verification, mock injection for testing)
+  - MailService (log driver writing to writable/logs/emails/ and SMTP support)
+  - Arabic RTL email layout and OTP template (`app/Views/emails/`)
+  - AuthService & AuthController (Google sign-in, email request, verify, refresh, logout, logout-all)
+  - AuthFilter & RoleFilter (Bearer JWT verification, active check, role authorization)
+  - MeController (profile view/update, Sudan phone validation/normalization, preferences, soft delete)
+  - CLI command `admin:create` with option parsing
+  - Automated tests passing in `tests/feature/AuthTest.php` (7 tests, 27 assertions)
 - [ ] **Phase 4: Product Catalog & Image Management**
   - Public endpoints: Categories, Brands, Products listing (filters/search/sort/paginate)
   - Product detail with stock level status, specs, accessories, images
@@ -98,21 +100,33 @@
 - Implemented Seeders: Settings, ShippingZones (18 Sudan states), Categories, Brands, Products (8 laptops + 6 accessories linked), Admin.
 - Verified database rollback and re-migration with `php spark migrate:refresh --all` and seeding with `php spark db:seed DatabaseSeeder`.
 - Created schema architecture document in `docs/DATABASE.md`.
-- Automated test `tests/feature/DatabaseTest.php` passing with 18 assertions.
+- Implemented `TokenService` with JWT HS256 access tokens and rotating refresh tokens with family theft detection.
+- Implemented `OtpService` with HMAC-SHA256, 10-minute expiry, 60s cooldown, 5 attempts max, single use.
+- Implemented `GoogleAuthService` with Google JWKS signature checking, caching, and mock injection.
+- Implemented `MailService` with log driver writing to `writable/logs/emails/` and RTL Arabic layout.
+- Implemented `AuthService` and `AuthController` (Google sign-in, OTP request/verify, refresh, logout, logout-all).
+- Implemented `AuthFilter` and `RoleFilter` with active status checks.
+- Implemented `MeController` (profile show/update, Sudan phone normalization `+249...`, preferences, soft delete).
+- Implemented `admin:create` spark command.
+- Verified end-to-end with curl and PHPUnit (`tests/feature/AuthTest.php` passing 7/7 tests).
 
 ---
 
 ## (c) What Is Next
-- **Phase 3: Authentication & User Management**
-  - Implement `TokenService` (JWT HS256 access tokens + rotating refresh token family with theft detection).
-  - Implement `OtpService` (HMAC-SHA256 hashed 6-digit codes, rate limiting, attempts tracking, single use).
-  - Implement `GoogleAuthService` (Google ID token verification against JWKS with caching).
-  - Implement `MailService` with `log` driver for local development.
-  - Implement `AuthService` and `AuthController` (Google sign-in, email request, verify, refresh, logout, logout-all).
-  - Implement `AuthFilter` and `RoleFilter` (staff/admin checks).
-  - Implement `MeController` (profile view/update, Sudan phone validation, preferences, soft delete).
-  - Implement CLI command `admin:create`.
-  - Feature tests for authentication flows.
+- **Phase 4: Product Catalog & Image Management**
+  - Implement public catalog endpoints:
+    - `GET /api/v1/shop` (public shop info, current exchange rate, lock hours, app discount %)
+    - `GET /api/v1/categories`, `GET /api/v1/brands`
+    - `GET /api/v1/products` (filtering by type, category, brand, condition, price range, search query, featured, in_stock; sorting by price_asc, price_desc, newest; pagination)
+    - `GET /api/v1/products/{slug}` (product detail: images, specs, suggested accessories, stock level status: in_stock/low/out)
+    - `GET /api/v1/shipping-zones`
+  - Implement `ImageService`: upload validation, GD re-encoding (EXIF stripping), resize to max 1600px, 400px thumbnail.
+  - Implement Admin CRUD endpoints (under `Admin/` namespace):
+    - Products CRUD, stock updates, soft-delete.
+    - Images upload, re-order, set primary, delete.
+    - Accessories link/unlink.
+    - Categories & Brands CRUD.
+  - Write feature tests for Catalog & Image management.
 
 ---
 

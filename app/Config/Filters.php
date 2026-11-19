@@ -32,6 +32,8 @@ class Filters extends BaseFilters
         'security'      => \App\Filters\SecurityHeadersFilter::class,
         'throttle'      => \App\Filters\ThrottleFilter::class,
         'forcehttps'    => \App\Filters\ForceHttpsFilter::class,
+        'auth'          => \App\Filters\AuthFilter::class,
+        'role'          => \App\Filters\RoleFilter::class,
     ];
 
     /**

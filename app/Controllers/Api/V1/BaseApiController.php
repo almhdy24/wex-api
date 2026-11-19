@@ -16,8 +16,26 @@ use CodeIgniter\HTTP\ResponseInterface;
 abstract class BaseApiController extends BaseController
 {
     /**
-     * Responds with standard successful JSON envelope (200 OK by default)
+     * CodeIgniter Controller remap hook.
+     * Intercepts all action calls to catch any ApiException and convert
+     * it to the standard JSON API error envelope.
      */
+    public function _remap(string $method, ...$params)
+    {
+        try {
+            return $this->{$method}(...$params);
+        } catch (ApiException $e) {
+            if ($e instanceof \App\Exceptions\TooManyRequestsException) {
+                $this->response->setHeader('Retry-After', (string) $e->getRetryAfter());
+            }
+
+            return $this->respondError(
+                message: $e->getMessage(),
+                statusCode: $e->getStatusCode(),
+                errors: $e->getErrors()
+            );
+        }
+    }
     protected function respondSuccess(
         mixed $data = null,
         string $message = '',
