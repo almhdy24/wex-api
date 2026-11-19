@@ -1,0 +1,66 @@
+#-------------------------
+# Environment Files
+#-------------------------
+.env
+.env.*
+!.env.example
+
+#-------------------------
+# Vendor / Dependencies
+#-------------------------
+/vendor/
+
+#-------------------------
+# Temporary and Runtime Files
+#-------------------------
+/writable/cache/*
+!/writable/cache/index.html
+!/writable/cache/.gitkeep
+
+/writable/logs/*
+!/writable/logs/index.html
+!/writable/logs/.gitkeep
+/writable/logs/emails/*
+!/writable/logs/emails/.gitkeep
+
+/writable/session/*
+!/writable/session/index.html
+!/writable/session/.gitkeep
+
+/writable/uploads/*
+!/writable/uploads/index.html
+!/writable/uploads/.gitkeep
+/writable/uploads/proofs/*
+!/writable/uploads/proofs/.gitkeep
+
+/writable/database/*
+!/writable/database/.gitkeep
+
+/writable/debugbar/*
+!/writable/debugbar/index.html
+!/writable/debugbar/.gitkeep
+
+/public/uploads/*
+!/public/uploads/.gitkeep
+/public/uploads/products/*
+!/public/uploads/products/.gitkeep
+!/public/uploads/products/.htaccess
+
+php_errors.log
+
+#-------------------------
+# Testing
+#-------------------------
+/tests/coverage*
+/build/
+/phpunit.xml
+
+#-------------------------
+# OS / Editor Files
+#-------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
