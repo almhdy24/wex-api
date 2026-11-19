@@ -49,14 +49,15 @@
   - PricingService: central integer math, exchange rate conversion, discount, rounding step
   - Unit tests for PricingService (4 tests, 16 assertions)
   - Feature tests for Settings, Rates, and Shipping Zones (5 tests, 39 assertions)
-- [ ] **Phase 6: Order Processing & Payment Proofs**
+- [x] **Phase 6: Order Processing & Payment Proofs**
   - OrderService & atomic stock reservation in DB transactions
-  - OrderStateMachine (defined valid transitions)
-  - Price lock dual enforcement (cron `orders:expire` + lazy check)
+  - OrderStateMachine (defined valid transitions matrix)
+  - Price lock dual enforcement (cron `orders:expire` + lazy check on read/upload)
   - Payment proof upload & secure authorized image streaming endpoint
   - Customer cancel & reorder endpoints
   - Admin/Staff order management & payment proof review (approve/reject)
-  - Comprehensive feature tests for order flow
+  - CLI command `orders:expire`
+  - Automated feature tests in `tests/feature/OrderTest.php` (9 tests, 45 assertions)
 - [ ] **Phase 7: Notifications & Email Outbox**
   - In-app notification system (unread count, mark read, list)
   - Email outbox pattern & worker command `mail:send` (retry backoff)
@@ -123,27 +124,40 @@
 - Implemented `tests/unit/PricingServiceTest.php` covering integer currency conversions, ceil rounding steps, and order breakdowns (4 tests, 16 assertions).
 - Implemented `tests/feature/SettingsTest.php` covering settings view/update, rate change audit trail, and shipping zone CRUD (5 tests, 39 assertions).
 - Total automated tests passing: 28 tests, 146 assertions.
+- Implemented `OrderStateMachine` with strict transition matrix, status labels in Arabic, and stock release rules.
+- Implemented `OrderService` with atomic stock decrement transactions (`UPDATE ... WHERE stock_quantity >= ?`), snapshot rate & prices, price-lock expiry countdown, lazy lock refresh, cancel, and reorder.
+- Implemented `PaymentProofService` with private image storage, authorized binary image streaming endpoint, and admin review (approve/reject with lock validity branching).
+- Implemented `OrderController`, `PaymentProofController`, `OrderAdminController`, and `PaymentAdminController`.
+- Implemented CLI command `orders:expire` (`php spark orders:expire`) for cron-based cleanup of overdue price-locked orders.
+- Added comprehensive feature tests in `tests/feature/OrderTest.php` (9 tests, 45 assertions passing).
+- Total automated tests passing: 37 tests, 191 assertions.
 - Updated curl documentation in `docs/curl-examples.md`.
 
 ---
 
 ## (c) What Is Next
-- **Phase 6: Order Processing & Payment Proofs (Critical Core)**
-  - Implement `OrderStateMachine`: state transitions matrix and validations
-    - Valid states: `pending_payment`, `payment_review`, `confirmed`, `ready_for_pickup`, `out_for_delivery`, `completed`, `cancelled`, `expired`
-  - Implement `OrderService`:
-    - `createOrder`: DB transaction, validate products active/in-stock, atomic stock reservation (`UPDATE products SET stock_quantity = stock_quantity - n WHERE id = ? AND stock_quantity >= n`), snapshot rate & prices, calculate totals with `PricingService`, set `lock_expires_at = now + lock_hours`, create `order_events`, return bank transfer details.
-    - `cancelOrder`: only if `pending_payment`, restores stock, adds timeline event.
-    - `reorder`: creates new order from expired/cancelled one at current rate.
-    - `refreshExpiry`: lazy lock check expiring overdue orders on read/proof upload.
-  - Implement `PaymentProofService`:
-    - Secure upload to `writable/uploads/proofs/` via `ImageService`.
-    - Validates order is `pending_payment` and lock has not expired. Transitions order to `payment_review`.
-    - Authorized image stream endpoint `GET /api/v1/orders/{order_number}/payment-proof/{id}/image` (serves image only to order owner or staff/admin).
-  - Implement Admin/Staff order management: status transitions, extend lock, approve/reject payment proof (approve -> `confirmed`; reject -> back to `pending_payment` if lock valid, else `expired` and restore stock).
-  - Implement CLI command `orders:expire`: runs every minute, expires stale orders, restores stock, queues emails/notifications, sends 30-minute reminder.
-  - Create controllers: `OrderController`, `PaymentProofController`, `Admin/OrderAdminController`, `Admin/PaymentAdminController`.
-  - Comprehensive feature tests in `tests/feature/OrderTest.php`. Commit Phase 6.
+- **Phase 7: Notifications & Email Outbox**
+  - Implement in-app notifications system (`NotificationService`, `NotificationController`):
+    - `GET /api/v1/notifications`: list notifications with pagination
+    - `GET /api/v1/notifications/unread-count`: quick badge counter
+    - `PATCH /api/v1/notifications/{id}/read`: mark single notification read
+    - `POST /api/v1/notifications/mark-all-read`: mark all notifications read
+  - Implement Email Outbox pattern:
+    - `MailService::enqueue()` writes to `email_outbox` table with status `pending`, retry attempts, and exponential backoff
+    - Spark worker command `mail:send`: processes batch of up to 20 emails, updates status to `sent` or `failed`
+  - Arabic RTL HTML email templates in `app/Views/emails/`:
+    - `order_created.php`: order summary, price lock timer, Bankak transfer account details
+    - `lock_warning.php`: reminder when 30 minutes remain before expiry
+    - `payment_received.php`: confirmation of receipt upload under review
+    - `payment_approved.php`: confirmation that payment was verified
+    - `payment_rejected.php`: explanation of rejection and instructions
+    - `ready_for_pickup.php`: notification that order is ready at Omdurman store
+    - `out_for_delivery.php`: courier name, phone, and delivery tracking notice
+    - `order_completed.php`: thank you and receipt
+    - `order_expired.php`: notice of cancellation due to lock expiry
+  - Wire notifications & email dispatch into `OrderService` and `PaymentProofService` events
+  - Automated tests in `tests/feature/NotificationTest.php`
+  - Verify and git commit Phase 7.
 
 ---
 

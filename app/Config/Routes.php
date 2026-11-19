@@ -29,6 +29,17 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->delete('/', 'MeController::delete');
     });
 
+    // Customer Orders & Payment Proofs (Authenticated)
+    $routes->group('orders', ['filter' => 'auth'], static function (RouteCollection $routes) {
+        $routes->get('/', 'OrderController::index');
+        $routes->post('/', 'OrderController::create');
+        $routes->get('(:segment)', 'OrderController::show/$1');
+        $routes->post('(:segment)/cancel', 'OrderController::cancel/$1');
+        $routes->post('(:segment)/reorder', 'OrderController::reorder/$1');
+        $routes->post('(:segment)/payment-proof', 'PaymentProofController::upload/$1');
+        $routes->get('(:segment)/payment-proof/(:num)/image', 'PaymentProofController::streamImage/$1/$2');
+    });
+
     // Public Catalog
     $routes->get('shop', 'SettingsController::shop');
     $routes->get('categories', 'CategoryController::index');
@@ -37,50 +48,57 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
     $routes->get('products/(:segment)', 'ProductController::show/$1');
     $routes->get('shipping-zones', 'ShippingZoneController::index');
 
-    // Admin Catalog Management (Auth + Admin Role)
-    $routes->group('admin', ['filter' => ['auth', 'role:admin']], static function (RouteCollection $routes) {
-        // Products CRUD
-        $routes->get('products', 'Admin\ProductAdminController::index');
-        $routes->post('products', 'Admin\ProductAdminController::create');
-        $routes->get('products/(:num)', 'Admin\ProductAdminController::show/$1');
-        $routes->patch('products/(:num)', 'Admin\ProductAdminController::update/$1');
-        $routes->delete('products/(:num)', 'Admin\ProductAdminController::delete/$1');
-        $routes->patch('products/(:num)/stock', 'Admin\ProductAdminController::updateStock/$1');
-        $routes->post('products/(:num)/accessories', 'Admin\ProductAdminController::linkAccessory/$1');
-        $routes->delete('products/(:num)/accessories/(:num)', 'Admin\ProductAdminController::unlinkAccessory/$1/$2');
+    // Admin & Staff Operations (Auth + Role Filter)
+    $routes->group('admin', ['filter' => ['auth', 'role:admin,staff']], static function (RouteCollection $routes) {
+        // Orders & Payment Reviews (Staff & Admin)
+        $routes->get('orders', 'Admin\OrderAdminController::index');
+        $routes->get('orders/(:segment)', 'Admin\OrderAdminController::show/$1');
+        $routes->patch('orders/(:segment)/status', 'Admin\OrderAdminController::updateStatus/$1');
+        $routes->post('orders/(:segment)/lock', 'Admin\OrderAdminController::extendLock/$1');
+        $routes->post('orders/(:segment)/proofs/(:num)/review', 'Admin\PaymentAdminController::review/$1/$2');
 
-        // Product Images
-        $routes->post('products/(:num)/images', 'Admin\ProductImageAdminController::upload/$1');
-        $routes->patch('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::update/$1/$2');
-        $routes->delete('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::delete/$1/$2');
+        // Products CRUD (Admin only)
+        $routes->get('products', 'Admin\ProductAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('products', 'Admin\ProductAdminController::create', ['filter' => 'role:admin']);
+        $routes->get('products/(:num)', 'Admin\ProductAdminController::show/$1', ['filter' => 'role:admin']);
+        $routes->patch('products/(:num)', 'Admin\ProductAdminController::update/$1', ['filter' => 'role:admin']);
+        $routes->delete('products/(:num)', 'Admin\ProductAdminController::delete/$1', ['filter' => 'role:admin']);
+        $routes->patch('products/(:num)/stock', 'Admin\ProductAdminController::updateStock/$1', ['filter' => 'role:admin']);
+        $routes->post('products/(:num)/accessories', 'Admin\ProductAdminController::linkAccessory/$1', ['filter' => 'role:admin']);
+        $routes->delete('products/(:num)/accessories/(:num)', 'Admin\ProductAdminController::unlinkAccessory/$1/$2', ['filter' => 'role:admin']);
 
-        // Categories CRUD
-        $routes->get('categories', 'Admin\CategoryAdminController::index');
-        $routes->post('categories', 'Admin\CategoryAdminController::create');
-        $routes->get('categories/(:num)', 'Admin\CategoryAdminController::show/$1');
-        $routes->patch('categories/(:num)', 'Admin\CategoryAdminController::update/$1');
-        $routes->delete('categories/(:num)', 'Admin\CategoryAdminController::delete/$1');
+        // Product Images (Admin only)
+        $routes->post('products/(:num)/images', 'Admin\ProductImageAdminController::upload/$1', ['filter' => 'role:admin']);
+        $routes->patch('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::update/$1/$2', ['filter' => 'role:admin']);
+        $routes->delete('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::delete/$1/$2', ['filter' => 'role:admin']);
 
-        // Brands CRUD
-        $routes->get('brands', 'Admin\BrandAdminController::index');
-        $routes->post('brands', 'Admin\BrandAdminController::create');
-        $routes->get('brands/(:num)', 'Admin\BrandAdminController::show/$1');
-        $routes->patch('brands/(:num)', 'Admin\BrandAdminController::update/$1');
-        $routes->delete('brands/(:num)', 'Admin\BrandAdminController::delete/$1');
+        // Categories CRUD (Admin only)
+        $routes->get('categories', 'Admin\CategoryAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('categories', 'Admin\CategoryAdminController::create', ['filter' => 'role:admin']);
+        $routes->get('categories/(:num)', 'Admin\CategoryAdminController::show/$1', ['filter' => 'role:admin']);
+        $routes->patch('categories/(:num)', 'Admin\CategoryAdminController::update/$1', ['filter' => 'role:admin']);
+        $routes->delete('categories/(:num)', 'Admin\CategoryAdminController::delete/$1', ['filter' => 'role:admin']);
 
-        // Settings & Operational Configuration
-        $routes->get('settings', 'Admin\SettingAdminController::index');
-        $routes->patch('settings', 'Admin\SettingAdminController::update');
+        // Brands CRUD (Admin only)
+        $routes->get('brands', 'Admin\BrandAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('brands', 'Admin\BrandAdminController::create', ['filter' => 'role:admin']);
+        $routes->get('brands/(:num)', 'Admin\BrandAdminController::show/$1', ['filter' => 'role:admin']);
+        $routes->patch('brands/(:num)', 'Admin\BrandAdminController::update/$1', ['filter' => 'role:admin']);
+        $routes->delete('brands/(:num)', 'Admin\BrandAdminController::delete/$1', ['filter' => 'role:admin']);
 
-        // Exchange Rates (AED -> SDG)
-        $routes->get('rates', 'Admin\RateAdminController::index');
-        $routes->post('rates', 'Admin\RateAdminController::update');
+        // Settings & Operational Configuration (Admin only)
+        $routes->get('settings', 'Admin\SettingAdminController::index', ['filter' => 'role:admin']);
+        $routes->patch('settings', 'Admin\SettingAdminController::update', ['filter' => 'role:admin']);
 
-        // Shipping Zones
-        $routes->get('shipping-zones', 'Admin\ShippingZoneAdminController::index');
-        $routes->post('shipping-zones', 'Admin\ShippingZoneAdminController::create');
-        $routes->patch('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::update/$1');
-        $routes->delete('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::delete/$1');
+        // Exchange Rates (AED -> SDG) (Admin only)
+        $routes->get('rates', 'Admin\RateAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('rates', 'Admin\RateAdminController::update', ['filter' => 'role:admin']);
+
+        // Shipping Zones (Admin only)
+        $routes->get('shipping-zones', 'Admin\ShippingZoneAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('shipping-zones', 'Admin\ShippingZoneAdminController::create', ['filter' => 'role:admin']);
+        $routes->patch('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::update/$1', ['filter' => 'role:admin']);
+        $routes->delete('shipping-zones/(:num)', 'Admin\ShippingZoneAdminController::delete/$1', ['filter' => 'role:admin']);
     });
 });
 

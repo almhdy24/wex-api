@@ -259,4 +259,129 @@ curl -i -X PATCH http://localhost:8081/api/v1/admin/shipping-zones/1 \
   -d '{"fee_sdg": 6000}'
 ```
 
+---
+
+## Phase 6: Order Processing & Payment Proofs
+
+### 1. Place New Order (Pickup with Price Lock)
+```bash
+curl -i -X POST http://localhost:8081/api/v1/orders \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_type": "pickup",
+    "contact_phone": "0912345678",
+    "customer_notes": "سأستلم في المساء",
+    "items": [
+      {"product_id": 1, "quantity": 1}
+    ]
+  }'
+```
+
+### 2. Place New Order (Courier Delivery)
+```bash
+curl -i -X POST http://localhost:8081/api/v1/orders \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_type": "delivery",
+    "shipping_zone_id": 1,
+    "delivery_address": "الخرطوم، شارع الستين، عمارة 12، شقة 4",
+    "contact_phone": "0912345678",
+    "items": [
+      {"product_id": 1, "quantity": 1},
+      {"product_id": 9, "quantity": 1}
+    ]
+  }'
+```
+
+### 3. List Customer Orders
+```bash
+curl -i http://localhost:8081/api/v1/orders \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 4. View Order Details & Bank Transfer Info
+```bash
+curl -i http://localhost:8081/api/v1/orders/WEX-261119-C59ED \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 5. Upload Bankak Transfer Proof (Customer)
+```bash
+curl -i -X POST http://localhost:8081/api/v1/orders/WEX-261119-C59ED/payment-proof \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>" \
+  -F "proof_image=@/path/to/bankak_receipt.jpg" \
+  -F "sender_name=محمد أحمد" \
+  -F "reference_number=MB-123456"
+```
+
+### 6. Stream Authorized Proof Image
+```bash
+curl -i http://localhost:8081/api/v1/orders/WEX-261119-C59ED/payment-proof/1/image \
+  -H "Authorization: Bearer <CUSTOMER_OR_ADMIN_TOKEN>"
+```
+
+### 7. Customer: Cancel Pending Order
+```bash
+curl -i -X POST http://localhost:8081/api/v1/orders/WEX-261119-C59ED/cancel \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "رغبت في تغيير موديل اللابتوب"}'
+```
+
+### 8. Customer: Reorder from Cancelled/Expired Order
+```bash
+curl -i -X POST http://localhost:8081/api/v1/orders/WEX-261119-C59ED/reorder \
+  -H "Authorization: Bearer <CUSTOMER_ACCESS_TOKEN>"
+```
+
+### 9. Admin/Staff: Review Payment Proof (Approve / Reject)
+```bash
+# Approve (transitions order to confirmed)
+curl -i -X POST http://localhost:8081/api/v1/admin/orders/WEX-261119-C59ED/proofs/1/review \
+  -H "Authorization: Bearer <ADMIN_OR_STAFF_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "approve",
+    "note": "تم مطابقة المبلغ في كشف حساب بنكك"
+  }'
+
+# Reject (transitions back to pending_payment or expired)
+curl -i -X POST http://localhost:8081/api/v1/admin/orders/WEX-261119-C59ED/proofs/1/review \
+  -H "Authorization: Bearer <ADMIN_OR_STAFF_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "reject",
+    "note": "المبلغ المحول غير مطابق لقيمة الطلب"
+  }'
+```
+
+### 10. Admin/Staff: Update Order Status
+```bash
+curl -i -X PATCH http://localhost:8081/api/v1/admin/orders/WEX-261119-C59ED/status \
+  -H "Authorization: Bearer <ADMIN_OR_STAFF_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "out_for_delivery",
+    "courier_name": "مندوب التوصيل - عثمان",
+    "courier_phone": "+249911223344",
+    "note": "خرج الطلب مع المندوب"
+  }'
+```
+
+### 11. Admin/Staff: Extend Price Lock
+```bash
+curl -i -X POST http://localhost:8081/api/v1/admin/orders/WEX-261119-C59ED/lock \
+  -H "Authorization: Bearer <ADMIN_OR_STAFF_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 6}'
+```
+
+### 12. CLI Command: Run Price-Lock Expiry Check
+```bash
+php spark orders:expire
+```
+
+
 

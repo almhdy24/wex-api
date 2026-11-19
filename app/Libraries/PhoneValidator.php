@@ -56,4 +56,12 @@ class PhoneValidator
     {
         return self::normalize($phone) !== null;
     }
+
+    /**
+     * Alias for normalize()
+     */
+    public static function normalizeSudanPhone(?string $phone): ?string
+    {
+        return self::normalize($phone);
+    }
 }
