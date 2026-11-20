@@ -2,6 +2,8 @@
 
 namespace App\Controllers\Api\V1;
 
+use App\Exceptions\EntityTooLargeException;
+use App\Exceptions\ValidationFailedException;
 use App\Services\PaymentProofService;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -26,8 +28,32 @@ class PaymentProofController extends BaseApiController
      */
     public function upload(string $orderNumber): ResponseInterface
     {
+        // Detect post_max_size overflow where PHP empties $_POST and $_FILES
+        $contentLength = (int) ($this->request->getHeaderLine('Content-Length') ?: ($_SERVER['CONTENT_LENGTH'] ?? 0));
+        $postMaxSizeStr = ini_get('post_max_size') ?: '64M';
+        $postMaxBytes = $this->parseIniBytes($postMaxSizeStr);
+        if ($contentLength > $postMaxBytes && empty($_FILES) && empty($_POST)) {
+            throw new EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
+        }
+
         $user = $this->currentUser();
-        $file = $this->request->getFile('proof_image') ?? $this->request->getFile('image');
+
+        // Enforce field name 'proof_image' only
+        $file = $this->request->getFile('proof_image');
+        if (!$file) {
+            $allFiles = $this->request->getFiles();
+            if (!empty($allFiles)) {
+                throw new ValidationFailedException(
+                    ['proof_image' => 'حقل الملف غير صحيح. الحقل المطلوب هو proof_image'],
+                    'حقل الملف غير صحيح. الحقل المطلوب هو proof_image'
+                );
+            }
+        }
+
+        if ($file && ($file->getError() === UPLOAD_ERR_INI_SIZE || $file->getError() === UPLOAD_ERR_FORM_SIZE)) {
+            throw new EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
+        }
+
         $senderName = $this->request->getPost('sender_name');
         $refNumber  = $this->request->getPost('reference_number');
 
@@ -40,6 +66,25 @@ class PaymentProofController extends BaseApiController
         );
 
         return $this->respondSuccess($result, 'تم رفع إشعار التحويل البنكي بنجاح وجاري مراجعته', ResponseInterface::HTTP_CREATED);
+    }
+
+    private function parseIniBytes(string $val): int
+    {
+        $val = trim($val);
+        $last = strtolower($val[strlen($val) - 1]);
+        $num = (int) $val;
+        switch ($last) {
+            case 'g':
+                $num *= 1024 * 1024 * 1024;
+                break;
+            case 'm':
+                $num *= 1024 * 1024;
+                break;
+            case 'k':
+                $num *= 1024;
+                break;
+        }
+        return $num;
     }
 
     /**

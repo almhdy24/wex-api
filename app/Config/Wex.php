@@ -74,11 +74,13 @@ class Wex extends BaseConfig
     public const PROOF_STATUS_PENDING  = 'pending';
     public const PROOF_STATUS_APPROVED = 'approved';
     public const PROOF_STATUS_REJECTED = 'rejected';
+    public const PROOF_STATUS_REPLACED = 'replaced';
 
     public const PROOF_STATUSES = [
         self::PROOF_STATUS_PENDING,
         self::PROOF_STATUS_APPROVED,
         self::PROOF_STATUS_REJECTED,
+        self::PROOF_STATUS_REPLACED,
     ];
 
     // Email Outbox Statuses

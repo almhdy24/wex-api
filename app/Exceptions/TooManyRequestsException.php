@@ -8,13 +8,16 @@ class TooManyRequestsException extends ApiException
 {
     protected int $retryAfter;
 
-    public function __construct(int $retryAfter = 60, string $message = '', ?Throwable $previous = null)
+    public function __construct(int|string $retryAfter = 60, string $message = '', ?Throwable $previous = null)
     {
-        if ($message === '') {
-            $message = lang('Api.too_many_requests');
+        if (is_string($retryAfter) && $message === '') {
+            $message = $retryAfter;
+            $retryAfter = 60;
+        } elseif ($message === '') {
+            $message = 'تجاوزت الحد المسموح من المحاولات';
         }
         parent::__construct($message, 429, null, $previous);
-        $this->retryAfter = $retryAfter;
+        $this->retryAfter = (int) $retryAfter;
     }
 
     public function getRetryAfter(): int

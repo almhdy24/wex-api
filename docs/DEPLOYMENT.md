@@ -213,3 +213,30 @@ curl -i https://api.wextechnology.sd/api/v1/admin/dashboard \
    ```
 2. **File Storage Backup:**
    Regularly archive `writable/uploads/` (containing product images and Bankak receipts).
+
+---
+
+## 8. File Upload Configuration & Limits
+
+For Bankak payment transfer receipts and product images:
+
+### PHP Configuration (`php.ini` or `/etc/php/8.x/fpm/conf.d/99-uploads.ini`)
+```ini
+file_uploads = On
+upload_max_filesize = 10M
+post_max_size = 12M
+memory_limit = 256M
+max_file_uploads = 5
+```
+
+### Nginx Configuration
+```nginx
+client_max_body_size 12M;
+```
+
+### Application Limit (`.env`)
+```ini
+UPLOAD_MAX_MB = 5
+```
+Uploads exceeding `UPLOAD_MAX_MB` or `post_max_size` trigger a standardized HTTP 413 error with the Arabic message:
+`"حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى"`.

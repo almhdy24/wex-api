@@ -69,18 +69,25 @@ class PaymentProofService
         }
 
         if ((int) $order->user_id !== $userId) {
-            throw new ForbiddenException('غير مصرح لك برفع إشعار تحويل لهذا الطلب.');
+            throw new ForbiddenException('لا تملك صلاحية الوصول إلى هذا الطلب');
         }
 
         // Lazy lock expiry check
         $this->orderService->refreshExpiry($order);
 
-        // Can only upload if pending_payment (or if payment_review after prior rejection)
-        if ($order->status !== Wex::ORDER_STATUS_PENDING_PAYMENT) {
-            if ($order->status === Wex::ORDER_STATUS_EXPIRED) {
-                throw new ConflictException('انتهت فترة حجز السعر لهذا الطلب. يرجى إنشاء طلب جديد.');
-            }
-            throw new ConflictException('لا يمكن رفع إشعار تحويل لهذا الطلب نظراً لحالته الحالية: ' . OrderStateMachine::getStatusLabel($order->status));
+        // Can upload if pending_payment or if payment_review (replacement)
+        if ($order->status === Wex::ORDER_STATUS_EXPIRED) {
+            throw new ConflictException('انتهت مهلة تثبيت السعر لهذا الطلب');
+        }
+
+        if ($order->lock_expires_at && strtotime($order->lock_expires_at) < time()) {
+            throw new ConflictException('انتهت مهلة تثبيت السعر لهذا الطلب');
+        }
+
+        if ($order->status === Wex::ORDER_STATUS_PAYMENT_REVIEW) {
+            // Replacement upload while review is pending and lock not expired
+        } elseif ($order->status !== Wex::ORDER_STATUS_PENDING_PAYMENT) {
+            throw new ConflictException('لا يمكن رفع إشعار تحويل لهذا الطلب في حالته الحالية');
         }
 
         // Rate limit: max 5 uploads per order per hour to protect against disk exhaustion
@@ -89,7 +96,7 @@ class PaymentProofService
             ->where('created_at >=', $oneHourAgo)
             ->countAllResults();
         if ($recentUploads >= 5) {
-            throw new \App\Exceptions\TooManyRequestsException('تم تجاوز الحد المسموح لمحاولات رفع إشعار التحويل لهذا الطلب (بحد أقصى 5 محاولات في الساعة).');
+            throw new \App\Exceptions\TooManyRequestsException(3600, 'تجاوزت الحد المسموح من المحاولات');
         }
 
         $isValid = $uploadedFile && (
@@ -98,17 +105,31 @@ class PaymentProofService
         );
 
         if (!$isValid) {
-            throw new ValidationFailedException(['proof_image' => 'يرجى إرفاق صورة إشعار التحويل البنكي.'], 'ملف إشعار التحويل غير صالح أو لم يتم اختياره.');
+            $err = $uploadedFile ? $uploadedFile->getError() : UPLOAD_ERR_NO_FILE;
+            if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+                throw new \App\Exceptions\EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
+            }
+            throw new ValidationFailedException(['proof_image' => 'الملف المرفق ليس صورة صالحة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP'], 'يرجى إرفاق صورة إشعار التحويل البنكي.');
         }
 
         // Store image privately using ImageService
         $relativePath = $this->imageService->savePaymentProof($uploadedFile);
 
         $nowStr = gmdate('Y-m-d H:i:s');
+        $isReplacement = ($order->status === Wex::ORDER_STATUS_PAYMENT_REVIEW);
         $db = Database::connect();
         $db->transBegin();
 
         try {
+            if ($isReplacement) {
+                // Mark previous pending proof(s) as replaced
+                $this->paymentProofs
+                    ->where('order_id', $order->id)
+                    ->where('status', Wex::PROOF_STATUS_PENDING)
+                    ->set(['status' => Wex::PROOF_STATUS_REPLACED])
+                    ->update();
+            }
+
             // Insert PaymentProof record
             $proof = new PaymentProof([
                 'order_id'         => $order->id,
@@ -121,14 +142,23 @@ class PaymentProofService
 
             $proofId = $this->paymentProofs->insert($proof);
 
-            // Transition order status to payment_review
-            $this->orders->update($order->id, [
-                'status'     => Wex::ORDER_STATUS_PAYMENT_REVIEW,
-                'updated_at' => $nowStr,
-            ]);
+            if (!$isReplacement) {
+                // Transition order status to payment_review
+                $this->orders->update($order->id, [
+                    'status'     => Wex::ORDER_STATUS_PAYMENT_REVIEW,
+                    'updated_at' => $nowStr,
+                ]);
+            }
 
             // Add timeline event
-            $note = 'قام العميل برفع إشعار التحويل البنكي للمراجعة';
+            if ($isReplacement) {
+                $fromStatus = Wex::ORDER_STATUS_PAYMENT_REVIEW;
+                $note = 'قام العميل بتحديث إشعار التحويل واستبدال الإشعار السابق للمراجعة';
+            } else {
+                $fromStatus = Wex::ORDER_STATUS_PENDING_PAYMENT;
+                $note = 'قام العميل برفع إشعار التحويل البنكي للمراجعة';
+            }
+
             if ($senderName) {
                 $note .= " (اسم المحول: {$senderName})";
             }
@@ -138,7 +168,7 @@ class PaymentProofService
 
             $this->orderEvents->insert(new OrderEvent([
                 'order_id'      => $order->id,
-                'from_status'   => Wex::ORDER_STATUS_PENDING_PAYMENT,
+                'from_status'   => $fromStatus,
                 'to_status'     => Wex::ORDER_STATUS_PAYMENT_REVIEW,
                 'actor_user_id' => $userId,
                 'note'          => $note,

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\EntityTooLargeException;
 use App\Exceptions\ValidationFailedException;
 use CodeIgniter\HTTP\Files\UploadedFile;
 
@@ -77,28 +78,24 @@ class ImageService
 
     /**
      * Processes and stores a private payment proof image in writable/uploads/proofs/.
+     * Validates by real finfo MIME type, never by client filename/extension.
      *
      * @return string Relative file path
-     * @throws ValidationFailedException
+     * @throws ValidationFailedException|EntityTooLargeException
      */
     public function storePaymentProof(UploadedFile $file): string
     {
-        $this->validateFile($file);
+        $extension = $this->validateProofFile($file);
 
         $uploadDir = WRITEPATH . 'uploads/proofs';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0700, true);
         }
 
-        $extension = strtolower($file->getExtension());
-        if ($extension === 'jpeg') {
-            $extension = 'jpg';
-        }
-
         $fileName = bin2hex(random_bytes(20)) . '.' . $extension;
         $destPath = $uploadDir . '/' . $fileName;
 
-        // Re-encode with GD to strip EXIF and prevent execution
+        // Re-encode with GD to strip EXIF and prevent execution (falls back to direct copy if GD fails)
         $this->reencodeAndResize($file->getTempName(), $destPath, 2000, 2000);
 
         return 'uploads/proofs/' . $fileName;
@@ -113,18 +110,59 @@ class ImageService
     }
 
     /**
-     * Validates upload size, real MIME type via finfo, and extension.
+     * Validates payment proof upload size and real finfo MIME type.
+     * Accepts files without extensions (e.g. filename "blob" or "receipt").
+     *
+     * @return string Normalized extension ('jpg', 'png', 'webp') derived from real MIME.
+     * @throws ValidationFailedException|EntityTooLargeException
+     */
+    public function validateProofFile(UploadedFile $file): string
+    {
+        $isValid = $file->isValid() || (ENVIRONMENT === 'testing' && $file->getError() === UPLOAD_ERR_OK && file_exists($file->getTempName()));
+        if (!$isValid) {
+            $err = $file->getError();
+            if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+                throw new EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
+            }
+            throw new ValidationFailedException(['proof_image' => 'الملف المرفق ليس صورة صالحة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP'], 'الملف المرفق ليس صورة صالحة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP');
+        }
+
+        if ($file->getSize() > $this->maxSizeBytes) {
+            throw new EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
+        }
+
+        // Check real MIME type using FileInfo, never relying on client-supplied extension
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $realMime = $finfo->file($file->getTempName());
+
+        if (!in_array($realMime, $this->allowedMimes, true)) {
+            throw new ValidationFailedException(['proof_image' => 'الملف المرفق ليس صورة صالحة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP'], 'الملف المرفق ليس صورة صالحة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP');
+        }
+
+        return match ($realMime) {
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/webp' => 'webp',
+            default      => 'jpg',
+        };
+    }
+
+    /**
+     * Validates product image upload size, real MIME type via finfo, and extension.
      */
     protected function validateFile(UploadedFile $file): void
     {
         $isValid = $file->isValid() || (ENVIRONMENT === 'testing' && $file->getError() === UPLOAD_ERR_OK && file_exists($file->getTempName()));
         if (!$isValid) {
+            $err = $file->getError();
+            if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+                throw new EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
+            }
             throw new ValidationFailedException(['image' => 'فشل في رفع الملف: ' . $file->getErrorString()]);
         }
 
         if ($file->getSize() > $this->maxSizeBytes) {
-            $maxMb = (int) ($this->maxSizeBytes / (1024 * 1024));
-            throw new ValidationFailedException(['image' => "حجم الملف يتجاوز الحد المسموح به ({$maxMb} ميجابايت)"]);
+            throw new EntityTooLargeException('حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى');
         }
 
         // Check real MIME type using FileInfo
@@ -143,12 +181,17 @@ class ImageService
 
     /**
      * Reads image, resizes if larger than max dimensions, and writes fresh re-encoded image.
+     * Falls back to copying validated original if GD lacks format or processing fails.
      */
     protected function reencodeAndResize(string $sourcePath, string $targetPath, int $maxWidth, int $maxHeight): void
     {
         $imageInfo = @getimagesize($sourcePath);
         if (!$imageInfo) {
-            throw new ValidationFailedException(['image' => 'ملف الصورة غير صالح أو تالف']);
+            log_message('warning', 'GD getimagesize failed on validated file: {path}, falling back to direct copy', ['path' => $sourcePath]);
+            if (!copy($sourcePath, $targetPath)) {
+                throw new ValidationFailedException(['proof_image' => 'فشل في حفظ ملف الإشعار']);
+            }
+            return;
         }
 
         $srcWidth  = $imageInfo[0];
@@ -157,14 +200,18 @@ class ImageService
 
         // Create GD resource from source
         $srcImg = match ($mime) {
-            'image/jpeg' => @imagecreatefromjpeg($sourcePath),
-            'image/png'  => @imagecreatefrompng($sourcePath),
+            'image/jpeg' => function_exists('imagecreatefromjpeg') ? @imagecreatefromjpeg($sourcePath) : null,
+            'image/png'  => function_exists('imagecreatefrompng') ? @imagecreatefrompng($sourcePath) : null,
             'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($sourcePath) : null,
             default      => null,
         };
 
         if (!$srcImg) {
-            throw new ValidationFailedException(['image' => 'تعذر معالجة الصورة عبر محرك الرسومات']);
+            log_message('warning', 'GD imagecreate failed for mime {mime}, falling back to direct copy', ['mime' => $mime]);
+            if (!copy($sourcePath, $targetPath)) {
+                throw new ValidationFailedException(['proof_image' => 'فشل في حفظ ملف الإشعار']);
+            }
+            return;
         }
 
         // Calculate aspect-ratio preserving dimensions
@@ -186,9 +233,9 @@ class ImageService
 
         // Save re-encoded target
         $saved = match ($mime) {
-            'image/jpeg' => imagejpeg($dstImg, $targetPath, 85),
-            'image/png'  => imagepng($dstImg, $targetPath, 8),
-            'image/webp' => function_exists('imagewebp') ? imagewebp($dstImg, $targetPath, 85) : imagejpeg($dstImg, $targetPath, 85),
+            'image/jpeg' => function_exists('imagejpeg') ? @imagejpeg($dstImg, $targetPath, 85) : false,
+            'image/png'  => function_exists('imagepng') ? @imagepng($dstImg, $targetPath, 8) : false,
+            'image/webp' => function_exists('imagewebp') ? @imagewebp($dstImg, $targetPath, 85) : (function_exists('imagejpeg') ? @imagejpeg($dstImg, $targetPath, 85) : false),
             default      => false,
         };
 
@@ -196,7 +243,10 @@ class ImageService
         imagedestroy($dstImg);
 
         if (!$saved) {
-            throw new ValidationFailedException(['image' => 'فشل في حفظ الصورة المعالجة']);
+            log_message('warning', 'GD save failed for mime {mime}, falling back to direct copy', ['mime' => $mime]);
+            if (!copy($sourcePath, $targetPath)) {
+                throw new ValidationFailedException(['proof_image' => 'فشل في حفظ الصورة المعالجة']);
+            }
         }
     }
 }

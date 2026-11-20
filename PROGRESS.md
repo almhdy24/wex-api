@@ -191,3 +191,17 @@
   - **Validation & Arabic Localization**: Created `app/Language/ar/Validation.php` translating all validation rules into Modern Standard Arabic. Purged colloquial terms from `app/Language/ar/Api.php`.
   - **Go-Live Documentation**: Created `docs/GO-LIVE.md` covering domain, HTTPS, SMTP, cron jobs, backups, and pre-launch checks.
   - **Testing**: 75/75 PHPUnit tests passing (3207 assertions, 100%).
+
+---
+
+## Phase A: Payment Proof Upload Fix (API)
+- **Status**: Completed
+- **Changes**:
+  - Enforced HTTP 413 `EntityTooLargeException` with Arabic message `"حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى"`.
+  - Added detection of PHP `post_max_size` overflow where `$_POST` and `$_FILES` are cleared by PHP engine.
+  - Accepted nameless blobs (`filename=blob`, `filename=receipt`) without extension, resolving MIME via `finfo(FILEINFO_MIME_TYPE)`.
+  - Graceful GD fallback: if image format fails GD decode, safely stores validated file instead of 500 error.
+  - Rate limiting fixed: `TooManyRequestsException` properly returns 429 with Arabic message `"تجاوزت الحد المسموح من المحاولات"`.
+  - Replacement support: when order is in `payment_review` and price lock is active, customer re-upload replaces prior pending proof (marked `replaced`), inserts new proof as `pending`, and logs timeline event.
+  - Verified 12 reproduction cases with curl against running server; added PHPUnit unit and feature tests.
+

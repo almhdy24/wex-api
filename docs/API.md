@@ -240,11 +240,16 @@ Authorization: Bearer <access_token>
   - **Auth:** Bearer Token (Order Owner)
   - **Content-Type:** `multipart/form-data`
   - **Form Fields:**
-    - `proof_image`: File (JPEG, PNG, WEBP, max 5MB)
-    - `sender_name`: string (optional, name on bank account)
-    - `reference_number`: string (optional, transaction reference)
-  - **Description:** Verifies price lock validity, re-encodes image via GD stripping EXIF, stores privately, transitions order status to `payment_review`, and notifies staff.
-  - **Rate Limit:** Maximum 5 uploads per order per hour.
+    - `proof_image`: File (JPEG, PNG, WEBP, max 5MB). Field name `proof_image` is strictly required. Accepts nameless blobs (`filename=blob` or `filename=receipt`).
+    - `sender_name`: string (optional, name on bank account, max 150)
+    - `reference_number`: string (optional, transaction reference, max 100)
+  - **Description:** Verifies price lock validity, validates real MIME type using `finfo`, re-encodes via GD stripping EXIF (with graceful direct copy fallback), stores privately, transitions order status to `payment_review`, and notifies staff. When an order is already in `payment_review`, re-upload replaces prior pending proof.
+  - **Error Responses:**
+    - `403 Forbidden`: Order does not belong to authenticated user (`"لا تملك صلاحية الوصول إلى هذا الطلب"`).
+    - `409 Conflict`: Price lock expired (`"انتهت مهلة تثبيت السعر لهذا الطلب"`).
+    - `413 Payload Too Large`: Upload exceeds limit or `post_max_size` (`"حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى"`).
+    - `422 Unprocessable Entity`: Missing `proof_image` field or invalid image content (`"الملف المرفق ليس صورة صالحة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP"`).
+    - `429 Too Many Requests`: Upload rate limit exceeded (maximum 5 attempts per order per hour, `"تجاوزت الحد المسموح من المحاولات"`).
 
 #### Stream Payment Proof Image
 - **`GET /api/v1/orders/{order_number}/payment-proof/{id}/image`**
