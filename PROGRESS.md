@@ -176,3 +176,18 @@
 
 ## (d) Decisions
 - Stored all architectural choices in `docs/DECISIONS.md` (passwordless OTP/Google, integer money, no DB enums, CSRF off for Bearer API, UTC timestamps, atomic stock reservations, dual price-lock expiry, email outbox pattern).
+
+---
+
+## Final Review Track (Branch: final-review) — Completed
+
+- [x] **New Admin Features & Backend Hardening**
+  - **Payment Accounts**: Created `payment_accounts` table, migration `2026-11-20-000002_CreatePaymentAccountsAnnouncementsAndContentTables.php`, seeded initial account from settings. Built `PaymentAccountService` and `PaymentAccountAdminController` with admin-only access, confirmation requirement, audit logging, and email notification via outbox. Guarded order creation if no active account.
+  - **Announcements**: Created `announcements` table, public endpoint `/api/v1/announcements` filtered by active window and schedule, and admin CRUD endpoints `/api/v1/admin/announcements`.
+  - **Recent Purchases Ticker**: Created `/api/v1/recent-purchases` returning anonymized real data from completed orders in past 30 days, respecting master setting `ticker_enabled` and per-order flag `ticker_hidden`. Built admin hide/unhide and settings endpoints.
+  - **Order-Taking Control**: Added settings `orders_enabled` and `orders_disabled_message`. Guarded `POST /api/v1/orders` to return 400 with polite Arabic message when orders are paused.
+  - **Dynamic Content**: Created tables, models, and controllers for `hero_slides`, `home_sections`, `faq_items`, `pages` (drafts: privacy-policy, terms, returns, about).
+  - **Brand filtering fix**: Updated `ProductService.php` to match brand filter case-insensitively by slug or name.
+  - **Validation & Arabic Localization**: Created `app/Language/ar/Validation.php` translating all validation rules into Modern Standard Arabic. Purged colloquial terms from `app/Language/ar/Api.php`.
+  - **Go-Live Documentation**: Created `docs/GO-LIVE.md` covering domain, HTTPS, SMTP, cron jobs, backups, and pre-launch checks.
+  - **Testing**: 75/75 PHPUnit tests passing (3207 assertions, 100%).
