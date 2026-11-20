@@ -292,4 +292,67 @@ final class AuthTest extends CIUnitTestCase
         $this->assertSame('', $cookie->getValue());
         $this->assertLessThanOrEqual(time(), $cookie->getExpiresTimestamp());
     }
+
+    public function testCorsPreflightAndAllowedOriginForViteAndLanIp(): void
+    {
+        // 1. Vite dev server origin on port 5371
+        $resVite = $this->withHeaders([
+            'Origin'                         => 'http://localhost:5371',
+            'Access-Control-Request-Method'  => 'POST',
+            'Access-Control-Request-Headers' => 'Content-Type, Authorization',
+        ])->options('api/v1/auth/refresh');
+
+        $resVite->assertStatus(204);
+        $resVite->assertHeader('Access-Control-Allow-Origin', 'http://localhost:5371');
+        $resVite->assertHeader('Access-Control-Allow-Credentials', 'true');
+
+        // 2. Android device testing over LAN IP (e.g. 192.168.x.x)
+        $resLan = $this->withHeaders([
+            'Origin'                         => 'http://192.168.1.120:5371',
+            'Access-Control-Request-Method'  => 'POST',
+            'Access-Control-Request-Headers' => 'Content-Type, Authorization',
+        ])->options('api/v1/auth/refresh');
+
+        $resLan->assertStatus(204);
+        $resLan->assertHeader('Access-Control-Allow-Origin', 'http://192.168.1.120:5371');
+        $resLan->assertHeader('Access-Control-Allow-Credentials', 'true');
+
+        // 3. Unauthorized external origin rejected
+        $resBad = $this->withHeaders([
+            'Origin'                         => 'http://untrusted-external-domain.com',
+            'Access-Control-Request-Method'  => 'POST',
+        ])->options('api/v1/auth/refresh');
+
+        $resBad->assertStatus(204);
+        $resBad->assertHeaderMissing('Access-Control-Allow-Origin');
+    }
+
+    public function testCookieAttributesForAndroidCompatibility(): void
+    {
+        $userModel = new UserModel();
+        $user = $userModel->where('role', Wex::ROLE_ADMIN)->first();
+
+        $tokenService = new TokenService();
+        $refreshToken = $tokenService->generateRefreshToken((int) $user->id);
+
+        $result = $this->withHeaders([
+            'Origin' => 'http://localhost:5371',
+            'Cookie' => 'wex_refresh_token=' . $refreshToken,
+        ])->post('api/v1/auth/refresh');
+
+        $result->assertStatus(200);
+        $result->assertHeader('Access-Control-Allow-Origin', 'http://localhost:5371');
+        $result->assertHeader('Access-Control-Allow-Credentials', 'true');
+
+        $cookie = $result->response()->getCookie('wex_refresh_token');
+        $this->assertNotNull($cookie);
+
+        // Required cookie attributes for Android persistence:
+        $this->assertTrue($cookie->isHTTPOnly());
+        $this->assertSame('/', $cookie->getPath());
+        $this->assertSame('', $cookie->getDomain()); // Host-only (RFC 6265 compliance for IPs)
+        $this->assertSame('Lax', $cookie->getSameSite());
+        $this->assertGreaterThan(2500000, $cookie->getMaxAge()); // 30-day persistent Max-Age
+        $this->assertGreaterThan(time(), $cookie->getExpiresTimestamp()); // Future Expires date
+    }
 }

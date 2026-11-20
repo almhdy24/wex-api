@@ -179,11 +179,22 @@ class AuthController extends BaseApiController
     }
 
     /**
-     * Set HttpOnly Secure SameSite refresh token cookie for web clients.
+     * Set HttpOnly SameSite refresh token cookie for web clients.
+     * Host-only cookie (empty domain) ensures support for localhost and LAN IPs on Android.
      */
     protected function setRefreshTokenCookie(string $token, int $ttl): void
     {
-        $secure = (bool) (env('COOKIE_SECURE', false) || $this->request->isSecure() || ENVIRONMENT === 'production');
+        $isHttps = $this->request->isSecure()
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' && $_SERVER['HTTPS'] !== '');
+
+        $cookieSecure = env('COOKIE_SECURE');
+        $secure = $cookieSecure !== null
+            ? filter_var($cookieSecure, FILTER_VALIDATE_BOOLEAN)
+            : $isHttps;
+
+        $samesite = (string) env('COOKIE_SAMESITE', 'Lax');
+
         $this->response->setCookie(
             'wex_refresh_token',
             $token,
@@ -193,7 +204,7 @@ class AuthController extends BaseApiController
             '',
             $secure,
             true,
-            'Lax'
+            $samesite
         );
     }
 
@@ -202,7 +213,17 @@ class AuthController extends BaseApiController
      */
     protected function clearRefreshTokenCookie(): void
     {
-        $secure = (bool) (env('COOKIE_SECURE', false) || $this->request->isSecure() || ENVIRONMENT === 'production');
+        $isHttps = $this->request->isSecure()
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' && $_SERVER['HTTPS'] !== '');
+
+        $cookieSecure = env('COOKIE_SECURE');
+        $secure = $cookieSecure !== null
+            ? filter_var($cookieSecure, FILTER_VALIDATE_BOOLEAN)
+            : $isHttps;
+
+        $samesite = (string) env('COOKIE_SAMESITE', 'Lax');
+
         $this->response->setCookie(
             'wex_refresh_token',
             '',
@@ -212,7 +233,7 @@ class AuthController extends BaseApiController
             '',
             $secure,
             true,
-            'Lax'
+            $samesite
         );
     }
 }
