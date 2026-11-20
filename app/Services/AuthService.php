@@ -248,6 +248,8 @@ class AuthService
             'phone'               => $user->phone,
             'role'                => $user->role,
             'avatar_url'          => $user->avatar_url,
+            'google_linked'       => !empty($user->google_id),
+            'email_verified'      => !empty($user->email_verified_at),
             'email_notifications' => (bool) $user->email_notifications,
             'is_active'           => (bool) $user->is_active,
             'created_at'          => $user->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($user->created_at)) : null,

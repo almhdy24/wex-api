@@ -110,6 +110,69 @@ class MeController extends BaseApiController
     }
 
     /**
+     * POST /api/v1/me/link-google
+     */
+    public function linkGoogle(): ResponseInterface
+    {
+        $user = $this->getCurrentUser();
+        $body = $this->getJsonBody();
+
+        if (empty($body['id_token'])) {
+            throw new ValidationFailedException(['id_token' => 'رمز Google ID مطلوب']);
+        }
+
+        $googleService = new \App\Services\GoogleAuthService();
+        $profile = $googleService->verifyIdToken((string) $body['id_token']);
+
+        // Prevent linking if another account already uses this google_id
+        $existing = $this->userModel->where('google_id', $profile['google_id'])->first();
+        if ($existing && (int) $existing->id !== (int) $user->id) {
+            throw new ValidationFailedException([
+                'google' => 'حساب Google هذا مرتبط بحساب عميل آخر بالفعل',
+            ]);
+        }
+
+        $this->userModel->update($user->id, [
+            'google_id'  => $profile['google_id'],
+            'avatar_url' => $profile['avatar_url'] ?? $user->avatar_url,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        $freshUser = $this->userModel->find($user->id);
+
+        return $this->respondSuccess(
+            $this->authService->formatUserData($freshUser),
+            'تم ربط حساب Google بنجاح'
+        );
+    }
+
+    /**
+     * POST /api/v1/me/unlink-google
+     */
+    public function unlinkGoogle(): ResponseInterface
+    {
+        $user = $this->getCurrentUser();
+
+        if (empty($user->email)) {
+            throw new ValidationFailedException([
+                'google' => 'لا يمكن إلغاء ربط Google لعدم وجود وسيلة دخول بديلة',
+            ]);
+        }
+
+        $this->userModel->update($user->id, [
+            'google_id'  => null,
+            'updated_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        $freshUser = $this->userModel->find($user->id);
+
+        return $this->respondSuccess(
+            $this->authService->formatUserData($freshUser),
+            'تم إلغاء ربط حساب Google بنجاح'
+        );
+    }
+
+    /**
      * DELETE /api/v1/me
      */
     public function delete(): ResponseInterface

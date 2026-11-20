@@ -26,6 +26,8 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->get('/', 'MeController::show');
         $routes->patch('/', 'MeController::update');
         $routes->patch('preferences', 'MeController::updatePreferences');
+        $routes->post('link-google', 'MeController::linkGoogle');
+        $routes->post('unlink-google', 'MeController::unlinkGoogle');
         $routes->delete('/', 'MeController::delete');
     });
 
