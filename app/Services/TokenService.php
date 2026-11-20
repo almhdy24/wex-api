@@ -83,12 +83,15 @@ class TokenService
 
     /**
      * Generates and stores a new refresh token.
+     * When fixedExpiresAt is provided (e.g. during rotation), the token inherits
+     * the session's absolute expiration timestamp to prevent indefinite extension.
      */
     public function generateRefreshToken(
         int $userId,
         ?string $familyId = null,
         ?string $userAgent = null,
-        ?string $ip = null
+        ?string $ip = null,
+        ?string $fixedExpiresAt = null
     ): string {
         $rawBytes = random_bytes(64);
         $rawToken = rtrim(strtr(base64_encode($rawBytes), '+/', '-_'), '=');
@@ -98,8 +101,10 @@ class TokenService
             $familyId = bin2hex(random_bytes(16));
         }
 
-        $now       = gmdate('Y-m-d H:i:s');
-        $expiresAt = gmdate('Y-m-d H:i:s', time() + $this->refreshTtlSeconds);
+        $now = gmdate('Y-m-d H:i:s');
+        $expiresAt = ($fixedExpiresAt !== null && $fixedExpiresAt !== '')
+            ? $fixedExpiresAt
+            : gmdate('Y-m-d H:i:s', time() + $this->refreshTtlSeconds);
 
         $this->tokenModel->insert([
             'user_id'        => $userId,
@@ -120,8 +125,9 @@ class TokenService
      * Rotates a refresh token.
      * Implements family-based theft detection: if an already-revoked token is presented,
      * the entire family of refresh tokens is immediately revoked.
+     * Inherits the original absolute expiration date so 30-day limits are never silently extended.
      *
-     * @return array{user_id: int, refresh_token: string}
+     * @return array{user_id: int, refresh_token: string, refresh_expires_in: int}
      * @throws UnauthorizedException
      */
     public function rotateRefreshToken(
@@ -154,12 +160,13 @@ class TokenService
             throw new UnauthorizedException(lang('Api.refresh_token_invalid'));
         }
 
-        // Generate new token in the same family
+        // Generate new token in the same family, strictly preserving original absolute expiration
         $newRawToken = $this->generateRefreshToken(
             (int) $record->user_id,
             $record->family_id,
             $userAgent,
-            $ip
+            $ip,
+            $record->expires_at
         );
 
         $newHash = hash('sha256', $newRawToken);
@@ -171,9 +178,12 @@ class TokenService
             'replaced_by_id' => $newRecord ? $newRecord->id : null,
         ]);
 
+        $remainingSeconds = max(0, strtotime($record->expires_at) - time());
+
         return [
-            'user_id'       => (int) $record->user_id,
-            'refresh_token' => $newRawToken,
+            'user_id'            => (int) $record->user_id,
+            'refresh_token'      => $newRawToken,
+            'refresh_expires_in' => $remainingSeconds,
         ];
     }
 

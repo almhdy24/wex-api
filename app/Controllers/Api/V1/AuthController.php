@@ -40,6 +40,8 @@ class AuthController extends BaseApiController
             $ip
         );
 
+        $this->setRefreshTokenCookie($data['refresh_token'], (int) ($data['refresh_expires_in'] ?? 30 * 86400));
+
         return $this->respondSuccess($data, 'تم تسجيل الدخول بنجاح');
     }
 
@@ -93,6 +95,8 @@ class AuthController extends BaseApiController
             $ip
         );
 
+        $this->setRefreshTokenCookie($data['refresh_token'], (int) ($data['refresh_expires_in'] ?? 30 * 86400));
+
         return $this->respondSuccess($data, 'تم تأكيد الرمز وتسجيل الدخول بنجاح');
     }
 
@@ -102,8 +106,20 @@ class AuthController extends BaseApiController
     public function refresh(): ResponseInterface
     {
         $body = $this->getJsonBody();
+        $refreshToken = !empty($body['refresh_token']) ? (string) $body['refresh_token'] : null;
 
-        if (empty($body['refresh_token'])) {
+        if ($refreshToken === null) {
+            $cookieToken = $this->request->getCookie('wex_refresh_token');
+            if (!empty($cookieToken)) {
+                $refreshToken = (string) $cookieToken;
+            } elseif ($cookieHeader = $this->request->getHeaderLine('Cookie')) {
+                if (preg_match('/(?:^|;\s*)wex_refresh_token=([^;]+)/', $cookieHeader, $matches)) {
+                    $refreshToken = urldecode($matches[1]);
+                }
+            }
+        }
+
+        if (empty($refreshToken)) {
             throw new ValidationFailedException(['refresh_token' => 'رمز التحديث مطلوب']);
         }
 
@@ -111,10 +127,12 @@ class AuthController extends BaseApiController
         $ip        = $this->request->getIPAddress();
 
         $data = $this->authService->refreshToken(
-            (string) $body['refresh_token'],
+            $refreshToken,
             $userAgent,
             $ip
         );
+
+        $this->setRefreshTokenCookie($data['refresh_token'], (int) ($data['refresh_expires_in'] ?? 30 * 86400));
 
         return $this->respondSuccess($data, 'تم تحديث جلسة الدخول بنجاح');
     }
@@ -125,10 +143,24 @@ class AuthController extends BaseApiController
     public function logout(): ResponseInterface
     {
         $body = $this->getJsonBody();
+        $refreshToken = !empty($body['refresh_token']) ? (string) $body['refresh_token'] : null;
 
-        if (!empty($body['refresh_token'])) {
-            $this->authService->logout((string) $body['refresh_token']);
+        if ($refreshToken === null) {
+            $cookieToken = $this->request->getCookie('wex_refresh_token');
+            if (!empty($cookieToken)) {
+                $refreshToken = (string) $cookieToken;
+            } elseif ($cookieHeader = $this->request->getHeaderLine('Cookie')) {
+                if (preg_match('/(?:^|;\s*)wex_refresh_token=([^;]+)/', $cookieHeader, $matches)) {
+                    $refreshToken = urldecode($matches[1]);
+                }
+            }
         }
+
+        if (!empty($refreshToken)) {
+            $this->authService->logout($refreshToken);
+        }
+
+        $this->clearRefreshTokenCookie();
 
         return $this->respondSuccess(null, lang('Api.logged_out'));
     }
@@ -141,6 +173,46 @@ class AuthController extends BaseApiController
         $user = $this->getCurrentUser();
         $this->authService->logoutAll((int) $user->id);
 
+        $this->clearRefreshTokenCookie();
+
         return $this->respondSuccess(null, lang('Api.logged_out_all'));
+    }
+
+    /**
+     * Set HttpOnly Secure SameSite refresh token cookie for web clients.
+     */
+    protected function setRefreshTokenCookie(string $token, int $ttl): void
+    {
+        $secure = (bool) (env('COOKIE_SECURE', false) || $this->request->isSecure() || ENVIRONMENT === 'production');
+        $this->response->setCookie(
+            'wex_refresh_token',
+            $token,
+            $ttl,
+            '',
+            '/',
+            '',
+            $secure,
+            true,
+            'Lax'
+        );
+    }
+
+    /**
+     * Clear the refresh token cookie.
+     */
+    protected function clearRefreshTokenCookie(): void
+    {
+        $secure = (bool) (env('COOKIE_SECURE', false) || $this->request->isSecure() || ENVIRONMENT === 'production');
+        $this->response->setCookie(
+            'wex_refresh_token',
+            '',
+            0,
+            '',
+            '/',
+            '',
+            $secure,
+            true,
+            'Lax'
+        );
     }
 }

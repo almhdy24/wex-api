@@ -208,4 +208,88 @@ final class AuthTest extends CIUnitTestCase
         $this->assertSame('google_tester@wex.sd', $authData['user']['email']);
         $this->assertSame('customer', $authData['user']['role']);
     }
+
+    public function testRefreshTokenViaCookiePreservesAbsoluteExpiration(): void
+    {
+        $userModel = new UserModel();
+        $user = $userModel->where('role', Wex::ROLE_ADMIN)->first();
+
+        $tokenService = new TokenService();
+        $initialRefreshToken = $tokenService->generateRefreshToken((int) $user->id);
+
+        $initialHash = hash('sha256', $initialRefreshToken);
+        $tokenModel = new \App\Models\RefreshTokenModel();
+        $initialRecord = $tokenModel->where('token_hash', $initialHash)->first();
+        $this->assertNotNull($initialRecord);
+        $originalExpiresAt = $initialRecord->expires_at;
+
+        // Call refresh using Cookie header and no JSON body
+        $result = $this->withHeaders(['Cookie' => 'wex_refresh_token=' . $initialRefreshToken])
+            ->post('api/v1/auth/refresh');
+
+        $result->assertStatus(200);
+        $result->assertCookie('wex_refresh_token');
+
+        $body = json_decode($result->getJSON(), true);
+        $this->assertTrue($body['success']);
+        $this->assertNotEmpty($body['data']['access_token']);
+        $this->assertNotEmpty($body['data']['refresh_token']);
+        $this->assertArrayHasKey('refresh_expires_in', $body['data']);
+
+        // Check new token in DB
+        $newHash = hash('sha256', $body['data']['refresh_token']);
+        $newRecord = $tokenModel->where('token_hash', $newHash)->first();
+        $this->assertNotNull($newRecord);
+
+        // Crucial requirement: rotated token MUST inherit original expires_at (no extension)
+        $this->assertSame((string) $originalExpiresAt, (string) $newRecord->expires_at);
+        $this->assertSame((int) $initialRecord->family_id, (int) $newRecord->family_id);
+    }
+
+    public function testLogoutViaCookieClearsCookieAndRevokesSession(): void
+    {
+        $userModel = new UserModel();
+        $user = $userModel->where('role', Wex::ROLE_ADMIN)->first();
+
+        $tokenService = new TokenService();
+        $refreshToken = $tokenService->generateRefreshToken((int) $user->id);
+
+        $result = $this->withHeaders(['Cookie' => 'wex_refresh_token=' . $refreshToken])
+            ->post('api/v1/auth/logout');
+
+        $result->assertStatus(200);
+
+        // Verify cookie is cleared/expired
+        $cookie = $result->response()->getCookie('wex_refresh_token');
+        $this->assertNotNull($cookie);
+        $this->assertSame('', $cookie->getValue());
+        $this->assertLessThanOrEqual(time(), $cookie->getExpiresTimestamp());
+
+        // Trying to refresh now fails
+        $refreshResult = $this->withHeaders(['Cookie' => 'wex_refresh_token=' . $refreshToken])
+            ->post('api/v1/auth/refresh');
+        $refreshResult->assertStatus(401);
+    }
+
+    public function testLogoutAllClearsCookie(): void
+    {
+        $userModel = new UserModel();
+        $user = $userModel->where('role', Wex::ROLE_ADMIN)->first();
+
+        $tokenService = new TokenService();
+        $access = $tokenService->generateAccessToken($user);
+
+        $result = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $access['access_token'],
+            'Cookie'        => 'wex_refresh_token=some_token',
+        ])->post('api/v1/auth/logout-all');
+
+        $result->assertStatus(200);
+
+        // Verify cookie is cleared/expired
+        $cookie = $result->response()->getCookie('wex_refresh_token');
+        $this->assertNotNull($cookie);
+        $this->assertSame('', $cookie->getValue());
+        $this->assertLessThanOrEqual(time(), $cookie->getExpiresTimestamp());
+    }
 }

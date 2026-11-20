@@ -199,11 +199,12 @@ class AuthService
         $access = $this->tokenService->generateAccessToken($user);
 
         return [
-            'access_token'  => $access['access_token'],
-            'refresh_token' => $rotation['refresh_token'],
-            'token_type'    => 'Bearer',
-            'expires_in'    => $access['expires_in'],
-            'user'          => $this->formatUserData($user),
+            'access_token'       => $access['access_token'],
+            'refresh_token'      => $rotation['refresh_token'],
+            'token_type'         => 'Bearer',
+            'expires_in'         => $access['expires_in'],
+            'refresh_expires_in' => $rotation['refresh_expires_in'] ?? (30 * 86400),
+            'user'               => $this->formatUserData($user),
         ];
     }
 
@@ -229,11 +230,12 @@ class AuthService
         $refreshToken = $this->tokenService->generateRefreshToken((int) $user->id, null, $userAgent, $ip);
 
         return [
-            'access_token'  => $access['access_token'],
-            'refresh_token' => $refreshToken,
-            'token_type'    => 'Bearer',
-            'expires_in'    => $access['expires_in'],
-            'user'          => $this->formatUserData($user),
+            'access_token'       => $access['access_token'],
+            'refresh_token'      => $refreshToken,
+            'token_type'         => 'Bearer',
+            'expires_in'         => $access['expires_in'],
+            'refresh_expires_in' => 30 * 86400,
+            'user'               => $this->formatUserData($user),
         ];
     }
 
