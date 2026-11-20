@@ -20,6 +20,7 @@ class Order extends Entity
         'discount_sdg'                  => 'integer',
         'delivery_fee_sdg'              => 'integer',
         'total_sdg'                     => 'integer',
+        'ticker_hidden'                 => 'boolean',
     ];
 
     public function isPendingPayment(): bool

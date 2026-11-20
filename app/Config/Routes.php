@@ -56,6 +56,27 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
     $routes->get('products/(:segment)', 'ProductController::show/$1');
     $routes->get('shipping-zones', 'ShippingZoneController::index');
 
+    // Public Announcements
+    $routes->get('announcements', 'AnnouncementController::index');
+
+    // Public Recent Purchases (Storefront Ticker)
+    $routes->get('recent-purchases', 'RecentPurchasesController::index');
+
+    // Public Content (Direct + Content prefix aliases)
+    $routes->get('hero-slides', 'ContentController::heroSlides');
+    $routes->get('home-sections', 'ContentController::homeSections');
+    $routes->get('faq', 'ContentController::faq');
+    $routes->get('pages', 'ContentController::pages');
+    $routes->get('pages/(:segment)', 'ContentController::page/$1');
+
+    $routes->group('content', static function (RouteCollection $routes) {
+        $routes->get('hero-slides', 'ContentController::heroSlides');
+        $routes->get('home-sections', 'ContentController::homeSections');
+        $routes->get('faq', 'ContentController::faq');
+        $routes->get('pages', 'ContentController::pages');
+        $routes->get('pages/(:segment)', 'ContentController::page/$1');
+    });
+
     // Admin & Staff Operations (Auth + Role Filter)
     $routes->group('admin', ['filter' => ['auth', 'role:admin,staff']], static function (RouteCollection $routes) {
         // Operational Dashboard (Admin & Staff)
@@ -67,6 +88,63 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->patch('orders/(:segment)/status', 'Admin\OrderAdminController::updateStatus/$1');
         $routes->post('orders/(:segment)/lock', 'Admin\OrderAdminController::extendLock/$1');
         $routes->post('orders/(:segment)/proofs/(:num)/review', 'Admin\PaymentAdminController::review/$1/$2');
+
+        // Payment Accounts CRUD (Admin only)
+        $routes->get('payment-accounts', 'Admin\PaymentAccountAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('payment-accounts', 'Admin\PaymentAccountAdminController::create', ['filter' => 'role:admin']);
+        $routes->get('payment-accounts/(:num)', 'Admin\PaymentAccountAdminController::show/$1', ['filter' => 'role:admin']);
+        $routes->patch('payment-accounts/(:num)', 'Admin\PaymentAccountAdminController::update/$1', ['filter' => 'role:admin']);
+        $routes->delete('payment-accounts/(:num)', 'Admin\PaymentAccountAdminController::delete/$1', ['filter' => 'role:admin']);
+        $routes->patch('payment-accounts/(:num)/toggle', 'Admin\PaymentAccountAdminController::toggle/$1', ['filter' => 'role:admin']);
+        $routes->post('payment-accounts/reorder', 'Admin\PaymentAccountAdminController::reorder', ['filter' => 'role:admin']);
+
+        // Announcements Management (Admin & Staff)
+        $routes->get('announcements', 'Admin\AnnouncementAdminController::index');
+        $routes->post('announcements', 'Admin\AnnouncementAdminController::create');
+        $routes->get('announcements/(:num)', 'Admin\AnnouncementAdminController::show/$1');
+        $routes->patch('announcements/(:num)', 'Admin\AnnouncementAdminController::update/$1');
+        $routes->delete('announcements/(:num)', 'Admin\AnnouncementAdminController::delete/$1');
+        $routes->patch('announcements/(:num)/toggle', 'Admin\AnnouncementAdminController::toggle/$1');
+
+        // Recent Purchases Ticker Management (Admin & Staff)
+        $routes->get('recent-purchases', 'Admin\RecentPurchasesAdminController::index');
+        $routes->patch('recent-purchases/(:num)/toggle-hide', 'Admin\RecentPurchasesAdminController::toggleHide/$1');
+        $routes->patch('recent-purchases/settings', 'Admin\RecentPurchasesAdminController::settings');
+
+        // Content Management - Hero Slides (Admin & Staff)
+        $routes->get('hero-slides', 'Admin\HeroSlideAdminController::index');
+        $routes->post('hero-slides', 'Admin\HeroSlideAdminController::create');
+        $routes->get('hero-slides/(:num)', 'Admin\HeroSlideAdminController::show/$1');
+        $routes->patch('hero-slides/(:num)', 'Admin\HeroSlideAdminController::update/$1');
+        $routes->delete('hero-slides/(:num)', 'Admin\HeroSlideAdminController::delete/$1');
+        $routes->patch('hero-slides/(:num)/toggle', 'Admin\HeroSlideAdminController::toggle/$1');
+        $routes->post('hero-slides/reorder', 'Admin\HeroSlideAdminController::reorder');
+
+        // Content Management - Home Sections (Admin & Staff)
+        $routes->get('home-sections', 'Admin\HomeSectionAdminController::index');
+        $routes->post('home-sections', 'Admin\HomeSectionAdminController::create');
+        $routes->get('home-sections/(:num)', 'Admin\HomeSectionAdminController::show/$1');
+        $routes->patch('home-sections/(:num)', 'Admin\HomeSectionAdminController::update/$1');
+        $routes->delete('home-sections/(:num)', 'Admin\HomeSectionAdminController::delete/$1');
+        $routes->patch('home-sections/(:num)/toggle', 'Admin\HomeSectionAdminController::toggle/$1');
+        $routes->post('home-sections/reorder', 'Admin\HomeSectionAdminController::reorder');
+
+        // Content Management - FAQ Items (Admin & Staff)
+        $routes->get('faq', 'Admin\FaqAdminController::index');
+        $routes->post('faq', 'Admin\FaqAdminController::create');
+        $routes->get('faq/(:num)', 'Admin\FaqAdminController::show/$1');
+        $routes->patch('faq/(:num)', 'Admin\FaqAdminController::update/$1');
+        $routes->delete('faq/(:num)', 'Admin\FaqAdminController::delete/$1');
+        $routes->patch('faq/(:num)/toggle', 'Admin\FaqAdminController::toggle/$1');
+        $routes->post('faq/reorder', 'Admin\FaqAdminController::reorder');
+
+        // Content Management - Pages (Admin & Staff)
+        $routes->get('pages', 'Admin\PageAdminController::index');
+        $routes->post('pages', 'Admin\PageAdminController::create');
+        $routes->get('pages/(:num)', 'Admin\PageAdminController::show/$1');
+        $routes->patch('pages/(:num)', 'Admin\PageAdminController::update/$1');
+        $routes->delete('pages/(:num)', 'Admin\PageAdminController::delete/$1');
+        $routes->patch('pages/(:num)/toggle', 'Admin\PageAdminController::toggle/$1');
 
         // Products CRUD (Admin only)
         $routes->get('products', 'Admin\ProductAdminController::index', ['filter' => 'role:admin']);

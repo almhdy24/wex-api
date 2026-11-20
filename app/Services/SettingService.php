@@ -37,6 +37,15 @@ class SettingService
         'app_discount_percent',
         'rounding_step_sdg',
         'low_stock_threshold',
+        'payment_general_notes',
+        'orders_enabled',
+        'orders_disabled_message',
+        'ticker_enabled',
+        'shop_map_link',
+        'social_facebook',
+        'social_instagram',
+        'footer_text',
+        'delivery_notes',
     ];
 
     public function __construct(
@@ -58,6 +67,27 @@ class SettingService
     {
         $row = $this->settings->where('key', $key)->first();
         return $row ? $row->value : $default;
+    }
+
+    /**
+     * Set or update a single setting by key.
+     */
+    public function set(string $key, string $value): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        $row = $this->settings->where('key', $key)->first();
+        if ($row) {
+            $this->settings->where('key', $key)->set([
+                'value'      => $value,
+                'updated_at' => $now,
+            ])->update();
+        } else {
+            $this->settings->insert([
+                'key'        => $key,
+                'value'      => $value,
+                'updated_at' => $now,
+            ]);
+        }
     }
 
     /**
@@ -87,15 +117,27 @@ class SettingService
     {
         $all = $this->getAllSettings();
 
+        $ordersEnabled = !isset($all['orders_enabled']) || ($all['orders_enabled'] !== '0' && $all['orders_enabled'] !== 0);
+        $tickerEnabled = isset($all['ticker_enabled']) && ($all['ticker_enabled'] === '1' || $all['ticker_enabled'] === 1);
+
         return [
-            'shop_name'            => $all['shop_name'] ?? 'Wex Technology',
-            'shop_address'         => $all['shop_address'] ?? 'مول الواحة، الشهداء، أم درمان',
-            'shop_phone'           => $all['shop_phone'] ?? '',
-            'shop_whatsapp'        => $all['shop_whatsapp'] ?? '',
-            'working_hours'        => $all['working_hours'] ?? '',
-            'lock_hours'           => (int) ($all['lock_hours'] ?? 4),
-            'app_discount_percent' => (int) ($all['app_discount_percent'] ?? 3),
-            'prices_updated_at'    => $this->getPricesUpdatedAt(),
+            'shop_name'               => (string) ($all['shop_name'] ?? 'Wex Technology'),
+            'shop_address'            => (string) ($all['shop_address'] ?? 'مول الواحة، الشهداء، أم درمان'),
+            'shop_phone'              => (string) ($all['shop_phone'] ?? ''),
+            'shop_whatsapp'           => (string) ($all['shop_whatsapp'] ?? ''),
+            'working_hours'           => (string) ($all['working_hours'] ?? ''),
+            'shop_map_link'           => (string) ($all['shop_map_link'] ?? ''),
+            'social_facebook'         => (string) ($all['social_facebook'] ?? ''),
+            'social_instagram'        => (string) ($all['social_instagram'] ?? ''),
+            'footer_text'             => (string) ($all['footer_text'] ?? ''),
+            'delivery_notes'          => (string) ($all['delivery_notes'] ?? ''),
+            'lock_hours'              => (int) ($all['lock_hours'] ?? 4),
+            'app_discount_percent'    => (int) ($all['app_discount_percent'] ?? 3),
+            'orders_enabled'          => (bool) $ordersEnabled,
+            'orders_disabled_message' => (string) ($all['orders_disabled_message'] ?? 'استقبال الطلبات متوقف مؤقتاً في الوقت الحالي، نعتذر عن الإزعاج.'),
+            'ticker_enabled'          => (bool) $tickerEnabled,
+            'payment_general_notes'   => (string) ($all['payment_general_notes'] ?? ''),
+            'prices_updated_at'       => $this->getPricesUpdatedAt(),
         ];
     }
 

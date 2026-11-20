@@ -85,6 +85,8 @@ class CustomerOrderPresenter
             'courier_phone'                 => $arr['courier_phone'] ?? null,
             'cancelled_reason'              => $arr['cancelled_reason'] ?? null,
             'bank_details'                  => $bankDetails,
+            'payment_accounts'              => $arr['payment_accounts'] ?? [],
+            'payment_general_notes'         => (string) ($arr['payment_general_notes'] ?? ''),
             'items'                         => $items,
             'timeline'                      => $timeline,
             'payment_proofs'                => $proofs,

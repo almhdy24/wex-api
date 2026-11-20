@@ -78,14 +78,20 @@ class ProductService
             }
         }
 
-        // Filter by Brand (slug or ID)
+        // Filter by Brand (slug, name, or ID)
         if (!empty($filters['brand'])) {
             if (is_numeric($filters['brand'])) {
                 $builder->where('brand_id', (int) $filters['brand']);
             } else {
-                $brand = $this->brandModel->where('slug', $filters['brand'])->first();
+                $brandInput = trim((string) $filters['brand']);
+                $brand = $this->brandModel
+                    ->groupStart()
+                        ->where('slug', strtolower($brandInput))
+                        ->orWhere('name', $brandInput)
+                    ->groupEnd()
+                    ->first();
                 if ($brand) {
-                    $builder->where('brand_id', $brand->id);
+                    $builder->where('brand_id', (int) $brand->id);
                 } else {
                     $builder->where('brand_id', 0);
                 }

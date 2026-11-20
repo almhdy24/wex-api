@@ -39,6 +39,7 @@ class OrderService
     protected PricingService $pricingService;
     protected SettingService $settingService;
     protected NotificationService $notificationService;
+    protected PaymentAccountService $paymentAccountService;
 
     public function __construct(
         ?OrderModel $orders = null,
@@ -50,18 +51,20 @@ class OrderService
         ?UserModel $users = null,
         ?PricingService $pricingService = null,
         ?SettingService $settingService = null,
-        ?NotificationService $notificationService = null
+        ?NotificationService $notificationService = null,
+        ?PaymentAccountService $paymentAccountService = null
     ) {
-        $this->orders              = $orders ?? new OrderModel();
-        $this->orderItems          = $orderItems ?? new OrderItemModel();
-        $this->orderEvents         = $orderEvents ?? new OrderEventModel();
-        $this->products            = $products ?? new ProductModel();
-        $this->shippingZones       = $shippingZones ?? new ShippingZoneModel();
-        $this->paymentProofs       = $paymentProofs ?? new PaymentProofModel();
-        $this->users               = $users ?? new UserModel();
-        $this->pricingService      = $pricingService ?? new PricingService();
-        $this->settingService      = $settingService ?? new SettingService();
-        $this->notificationService = $notificationService ?? new NotificationService();
+        $this->orders                = $orders ?? new OrderModel();
+        $this->orderItems            = $orderItems ?? new OrderItemModel();
+        $this->orderEvents           = $orderEvents ?? new OrderEventModel();
+        $this->products              = $products ?? new ProductModel();
+        $this->shippingZones         = $shippingZones ?? new ShippingZoneModel();
+        $this->paymentProofs         = $paymentProofs ?? new PaymentProofModel();
+        $this->users                 = $users ?? new UserModel();
+        $this->pricingService        = $pricingService ?? new PricingService();
+        $this->settingService        = $settingService ?? new SettingService();
+        $this->notificationService   = $notificationService ?? new NotificationService();
+        $this->paymentAccountService = $paymentAccountService ?? new PaymentAccountService();
     }
 
     /**
@@ -73,6 +76,21 @@ class OrderService
      */
     public function createOrder(int $userId, array $data): array
     {
+        // Guard 1: Are orders enabled?
+        $ordersEnabled = $this->settingService->get('orders_enabled', '1');
+        if ($ordersEnabled === '0' || $ordersEnabled === 0 || $ordersEnabled === false) {
+            $msg = (string) $this->settingService->get('orders_disabled_message', 'استقبال الطلبات متوقف مؤقتاً في الوقت الحالي، نعتذر عن الإزعاج.');
+            throw new ValidationFailedException($msg, ['orders' => $msg]);
+        }
+
+        // Guard 2: Are there active payment accounts?
+        $activeAccounts = $this->paymentAccountService->getActiveAccounts();
+        if (empty($activeAccounts)) {
+            throw new ValidationFailedException('لا توجد حسابات دفع بنكية مفعلة حالياً لإتمام الطلب، يرجى التواصل مع إدارة المتجر.', [
+                'payment_accounts' => 'لا توجد حسابات دفع مفعلة حالياً.',
+            ]);
+        }
+
         $orderType = $data['order_type'] ?? null;
         if (!in_array($orderType, Wex::DELIVERY_TYPES, true)) {
             throw new ValidationFailedException('نوع الطلب غير صحيح. يجب أن يكون استلام من المحل (pickup) أو توصيل (delivery).', [
@@ -568,11 +586,26 @@ class OrderService
             ? max(0, $expiresAt - $now)
             : 0;
 
-        // Public bank details for payment
+        // Payment accounts for customer view
+        $activeAccounts = $this->paymentAccountService->getActiveAccounts();
+        $formattedAccounts = array_map(static function ($acc) {
+            return [
+                'id'             => (int) $acc->id,
+                'bank_name'      => (string) $acc->bank_name,
+                'account_name'   => (string) $acc->account_name,
+                'account_number' => (string) $acc->account_number,
+                'branch'         => $acc->branch ? (string) $acc->branch : null,
+                'notes'          => $acc->notes ? (string) $acc->notes : null,
+            ];
+        }, $activeAccounts);
+
+        $firstAccount = !empty($activeAccounts) ? $activeAccounts[0] : null;
+
+        // Public bank details for payment (backward compatibility)
         $bankDetails = [
-            'bank_name'           => $this->settingService->get('bank_name', 'بنك الخرطوم (تطبيق بنكك)'),
-            'bank_account_name'   => $this->settingService->get('bank_account_name', 'Wex Technology - ويكس تكنولوجي'),
-            'bank_account_number' => $this->settingService->get('bank_account_number', '2849102'),
+            'bank_name'           => $firstAccount ? $firstAccount->bank_name : $this->settingService->get('bank_name', 'بنك الخرطوم (تطبيق بنكك)'),
+            'bank_account_name'   => $firstAccount ? $firstAccount->account_name : $this->settingService->get('bank_account_name', 'Wex Technology - ويكس تكنولوجي'),
+            'bank_account_number' => $firstAccount ? $firstAccount->account_number : $this->settingService->get('bank_account_number', '2849102'),
             'amount_sdg'          => (int) $order->total_sdg,
             'order_number'        => $order->order_number,
         ];
@@ -598,6 +631,8 @@ class OrderService
             'courier_phone'                 => $order->courier_phone,
             'cancelled_reason'              => $order->cancelled_reason,
             'bank_details'                  => $bankDetails,
+            'payment_accounts'              => $formattedAccounts,
+            'payment_general_notes'         => (string) $this->settingService->get('payment_general_notes', ''),
             'items'                         => $formattedItems,
             'timeline'                      => $formattedEvents,
             'payment_proofs'                => $formattedProofs,

@@ -32,6 +32,7 @@ class OrderModel extends Model
         'courier_name',
         'courier_phone',
         'cancelled_reason',
+        'ticker_hidden',
     ];
 
     protected $useTimestamps = true;
