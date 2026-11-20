@@ -78,9 +78,10 @@ Authorization: Bearer <access_token>
   - **Headers:** Optional `Accept-Language: en` (defaults to Arabic)
   - **Response 200:** Returns service status, version (`1.0.0`), UTC timestamp, and environment.
 
-#### Public Shop Information & Exchange Rate
+#### Public Shop Information
 - **`GET /api/v1/shop`**
-  - **Description:** Returns shop name, phone, WhatsApp, address, bank transfer details (Bankak account & name), current exchange rate (AED to SDG), and price-lock duration in hours.
+  - **Description:** Returns shop metadata: name, phone, WhatsApp, address, working hours, lock_hours, app_discount_percent, and prices_updated_at.
+  - **Privacy:** Reference currency (AED) and exchange rates are strictly business-private and omitted from customer responses. Bank details are omitted here and provided inside authenticated order responses.
 
 #### Shipping Zones
 - **`GET /api/v1/shipping-zones`**
@@ -178,10 +179,11 @@ Authorization: Bearer <access_token>
     - `brand` (slug string)
     - `type` (`laptop` | `phone` | `accessory`)
     - `condition` (`new` | `used_imported`)
-    - `min_price` (integer in AED)
-    - `max_price` (integer in AED)
-    - `search` (keyword matched against name and short description)
-    - `sort` (`price_asc`, `price_desc`, `latest`, `name_asc`)
+    - `min_price_sdg` (integer in SDG)
+    - `max_price_sdg` (integer in SDG)
+    - `q` / `search` (keyword matched against name, specs, and short description)
+    - `sort` (`price_asc`, `price_desc`, `newest`)
+  - **Pricing Policy:** Products in customer endpoints are transformed through `PublicProductPresenter` and expose only `price_sdg`. Reference currency (AED) and exchange rates are strictly hidden from customers.
   - **Response 200:** Returns product cards with calculated `price_sdg`, `price_aed`, `stock_status` (`in_stock` | `low_stock` | `out_of_stock`), primary image, category, and brand.
 
 #### Product Detail

@@ -188,13 +188,13 @@ final class NotificationTest extends CIUnitTestCase
             ]
         );
 
-        // Process outbox
-        $result = $mailService->processOutbox(10);
+        // Process outbox (batch size large enough to handle prior test emails in shared test DB)
+        $result = $mailService->processOutbox(100);
         $this->assertGreaterThanOrEqual(1, $result['sent']);
 
         // Check status updated in outbox
         $outboxModel = new EmailOutboxModel();
-        $sentEmail = $outboxModel->where('to_email', 'test_dispatch@example.com')->first();
+        $sentEmail = $outboxModel->where('to_email', 'test_dispatch@example.com')->orderBy('id', 'DESC')->first();
         $this->assertNotNull($sentEmail);
         $this->assertSame('sent', $sentEmail->status);
         $this->assertNotNull($sentEmail->sent_at);

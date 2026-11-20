@@ -2,6 +2,7 @@
 
 namespace App\Controllers\Api\V1;
 
+use App\Presenters\PublicProductPresenter;
 use App\Services\ProductService;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -9,6 +10,7 @@ use CodeIgniter\HTTP\ResponseInterface;
  * ProductController
  *
  * Public endpoints for product browsing, filtering, search, and detail views.
+ * Customers only see SDG prices through PublicProductPresenter.
  */
 class ProductController extends BaseApiController
 {
@@ -30,7 +32,7 @@ class ProductController extends BaseApiController
 
         $allowedFilterKeys = [
             'type', 'category', 'brand', 'condition',
-            'min_price_aed', 'max_price_aed',
+            'min_price_sdg', 'max_price_sdg',
             'featured', 'in_stock', 'q', 'sort',
         ];
 
@@ -43,9 +45,10 @@ class ProductController extends BaseApiController
         }
 
         $result = $this->productService->listPublicProducts($filters, $page, $perPage);
+        $presentedItems = PublicProductPresenter::presentCollection($result['items']);
 
         return $this->respondPaginated(
-            items: $result['items'],
+            items: $presentedItems,
             page: $page,
             perPage: $perPage,
             total: $result['total'],
@@ -59,7 +62,8 @@ class ProductController extends BaseApiController
     public function show(string $slug): ResponseInterface
     {
         $data = $this->productService->getPublicProductDetail($slug);
+        $presented = PublicProductPresenter::presentDetail($data);
 
-        return $this->respondSuccess($data, 'تفاصيل الجهاز');
+        return $this->respondSuccess($presented, 'تفاصيل الجهاز');
     }
 }

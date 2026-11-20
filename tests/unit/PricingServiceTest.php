@@ -64,6 +64,23 @@ final class PricingServiceTest extends CIUnitTestCase
         $this->assertSame(887700, $totals['total_sdg']);
     }
 
+    public function testCalculateOrderItemPrices(): void
+    {
+        // 750 AED at 650 rate = 487,500 SDG. Step 100 -> 487,500. Quantity 2 -> 975,000 SDG.
+        $itemPricing = $this->pricing->calculateOrderItemPrices(
+            priceAed: 750,
+            rateSdg: 650,
+            quantity: 2,
+            roundingStep: 100
+        );
+
+        $this->assertSame(750, $itemPricing['unit_price_aed']);
+        $this->assertSame(1500, $itemPricing['line_total_aed']);
+        $this->assertSame(487500, $itemPricing['unit_price_sdg']);
+        $this->assertSame(975000, $itemPricing['line_total_sdg']);
+        $this->assertSame(2, $itemPricing['quantity']);
+    }
+
     public function testZeroDiscountCalculation(): void
     {
         $totals = $this->pricing->calculateOrderTotals(

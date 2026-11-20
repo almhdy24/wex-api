@@ -57,3 +57,13 @@ This document tracks all design and technical decisions made for the **wex-api**
 - **Decision:** All administrative actions (exchange rate modifications, order status transitions, manual price-lock extensions, payment proof approvals/rejections, shop settings updates, and user role/status changes) are recorded to the `audit_logs` table with user ID, action name, entity type, ID, old/new values, IP address, and user agent.
 - **Safeguards:** Self-modification locks in `UserAdminController` prevent administrators from demoting their own role or deactivating their own account, preventing accidental total lockout of administrative access.
 
+### 12. Business-Private Reference Currency and Exchange Rate
+- **Decision:** The underlying reference currency (AED) and current exchange rate (`exchange_rate_sdg`) are treated as strictly internal business-private metrics. Public and authenticated customer interfaces (APIs, web storefront, order receipts, notifications, emails) expose ONLY Sudanese Pound (`price_sdg`, `unit_price_sdg`, `line_total_sdg`, `subtotal_sdg`, `discount_sdg`, `delivery_fee_sdg`, `total_sdg`). Customers are never shown AED amounts, rates, or conversion calculations.
+- **Rationale:** Protects store wholesale sourcing margins, prevents customers from calculating store markups or negotiating based on daily forex fluctuations, and simplifies customer checkout by presenting single-currency pricing with a transparent reassurance notice and price lock guarantee.
+- **Implementation:**
+  - Whitelist presenters (`PublicProductPresenter`, `CustomerOrderPresenter`) filter out all currency reference keys and values.
+  - Controllers never return raw entities for catalog or orders.
+  - `order_items` stores snapshotted `unit_price_sdg` and `line_total_sdg` alongside `unit_price_aed` and `line_total_aed`.
+  - `prices_updated_at` setting provides timestamp of the latest price/rate change without revealing the rate itself.
+  - Admin users and staff retain full visibility and editing capabilities for AED prices, conversion rates, rate audit history, and AED subtotals.
+

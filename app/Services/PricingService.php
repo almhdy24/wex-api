@@ -66,6 +66,20 @@ class PricingService
     }
 
     /**
+     * Retrieves the UTC timestamp when prices or rates were last updated.
+     */
+    public function getPricesUpdatedAt(): string
+    {
+        $row = $this->settingModel->where('key', 'prices_updated_at')->first();
+        if ($row && !empty($row->value)) {
+            $ts = strtotime($row->value);
+            return $ts ? gmdate('Y-m-d\TH:i:s\Z', $ts) : gmdate('Y-m-d\TH:i:s\Z');
+        }
+
+        return $this->getRateUpdatedAt();
+    }
+
+    /**
      * Retrieves the rounding step in whole SDG (default 100 SDG).
      */
     public function getRoundingStepSdg(): int
@@ -121,9 +135,30 @@ class PricingService
     }
 
     /**
+     * Calculates item prices in AED and SDG with rounding step applied.
+     *
+     * @return array{unit_price_aed: int, line_total_aed: int, unit_price_sdg: int, line_total_sdg: int, quantity: int}
+     */
+    public function calculateOrderItemPrices(int $priceAed, int $rateSdg, int $quantity, ?int $roundingStep = null): array
+    {
+        $step = $roundingStep ?? $this->getRoundingStepSdg();
+        $unitPriceSdg = $this->convertAedToSdg($priceAed, $rateSdg, $step);
+        $lineTotalSdg = $unitPriceSdg * $quantity;
+        $lineTotalAed = $priceAed * $quantity;
+
+        return [
+            'unit_price_aed' => $priceAed,
+            'line_total_aed' => $lineTotalAed,
+            'unit_price_sdg' => $unitPriceSdg,
+            'line_total_sdg' => $lineTotalSdg,
+            'quantity'       => $quantity,
+        ];
+    }
+
+    /**
      * Computes the order price breakdown:
      * - subtotal_aed
-     * - subtotal_sdg (converted at snapshot rate)
+     * - subtotal_sdg (converted at snapshot rate or sum of line totals)
      * - discount_sdg (computed percentage from subtotal_sdg, rounded)
      * - delivery_fee_sdg (added as-is)
      * - total_sdg (rounded final total)
@@ -133,6 +168,7 @@ class PricingService
      * @param int $discountPercent Snapshot discount percentage
      * @param int $deliveryFeeSdg Delivery fee in whole SDG
      * @param int|null $roundingStep Rounding step in whole SDG
+     * @param int|null $subtotalSdg Sum of item line totals in SDG (if already computed)
      * @return array{subtotal_aed: int, subtotal_sdg: int, discount_sdg: int, delivery_fee_sdg: int, total_sdg: int}
      */
     public function calculateOrderTotals(
@@ -140,13 +176,16 @@ class PricingService
         int $rateSdg,
         int $discountPercent,
         int $deliveryFeeSdg,
-        ?int $roundingStep = null
+        ?int $roundingStep = null,
+        ?int $subtotalSdg = null
     ): array {
         $step = $roundingStep ?? $this->getRoundingStepSdg();
 
-        // 1. Raw Subtotal in SDG
-        $rawSubtotalSdg = $subtotalAed * $rateSdg;
-        $subtotalSdg    = $this->roundSdg($rawSubtotalSdg, $step);
+        // 1. Subtotal in SDG (sum of line totals if provided, otherwise computed from subtotalAed)
+        if ($subtotalSdg === null) {
+            $rawSubtotalSdg = $subtotalAed * $rateSdg;
+            $subtotalSdg    = $this->roundSdg($rawSubtotalSdg, $step);
+        }
 
         // 2. Discount in SDG
         $discountSdg = 0;

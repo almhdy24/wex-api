@@ -20,6 +20,8 @@ class OrderItemModel extends Model
         'unit_price_aed',
         'quantity',
         'line_total_aed',
+        'unit_price_sdg',
+        'line_total_sdg',
     ];
 
     protected $useTimestamps = false;

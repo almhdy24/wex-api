@@ -148,8 +148,14 @@ class OrderService
         $db->transBegin();
 
         try {
+            // Snapshot rate and pricing parameters
+            $rateSdg         = $this->pricingService->getCurrentRateSdg();
+            $discountPercent = $this->pricingService->getAppDiscountPercent();
+            $roundingStep    = $this->pricingService->getRoundingStepSdg();
+
             $orderItemsToInsert = [];
             $subtotalAed = 0;
+            $subtotalSdg = 0;
 
             foreach ($consolidatedItems as $productId => $qty) {
                 // Fetch product with lock/check
@@ -169,8 +175,15 @@ class OrderService
                 }
 
                 $unitPriceAed = (int) $product->price_aed;
-                $lineTotalAed = $unitPriceAed * $qty;
-                $subtotalAed += $lineTotalAed;
+                $itemPricing = $this->pricingService->calculateOrderItemPrices(
+                    priceAed: $unitPriceAed,
+                    rateSdg: $rateSdg,
+                    quantity: $qty,
+                    roundingStep: $roundingStep
+                );
+
+                $subtotalAed += $itemPricing['line_total_aed'];
+                $subtotalSdg += $itemPricing['line_total_sdg'];
 
                 $orderItemsToInsert[] = [
                     'product_id'            => $productId,
@@ -178,21 +191,19 @@ class OrderService
                     'product_type_snapshot' => $product->type,
                     'unit_price_aed'        => $unitPriceAed,
                     'quantity'              => $qty,
-                    'line_total_aed'        => $lineTotalAed,
+                    'line_total_aed'        => $itemPricing['line_total_aed'],
+                    'unit_price_sdg'        => $itemPricing['unit_price_sdg'],
+                    'line_total_sdg'        => $itemPricing['line_total_sdg'],
                 ];
             }
-
-            // Snapshot rate and pricing calculations
-            $rateSdg         = $this->pricingService->getCurrentRateSdg();
-            $discountPercent = $this->pricingService->getAppDiscountPercent();
-            $roundingStep    = $this->pricingService->getRoundingStepSdg();
 
             $totals = $this->pricingService->calculateOrderTotals(
                 subtotalAed: $subtotalAed,
                 rateSdg: $rateSdg,
                 discountPercent: $discountPercent,
                 deliveryFeeSdg: $deliveryFeeSdg,
-                roundingStep: $roundingStep
+                roundingStep: $roundingStep,
+                subtotalSdg: $subtotalSdg
             );
 
             // Compute price lock expiry time
@@ -491,7 +502,16 @@ class OrderService
 
         // Fetch items
         $items = $this->orderItems->where('order_id', $order->id)->findAll();
-        $formattedItems = array_map(function (OrderItem $item) {
+        $formattedItems = array_map(function (OrderItem $item) use ($order) {
+            $unitPriceSdg = (int) ($item->unit_price_sdg ?? 0);
+            $lineTotalSdg = (int) ($item->line_total_sdg ?? 0);
+            if ($unitPriceSdg === 0 && !empty($item->unit_price_aed)) {
+                $rate = (int) ($order->rate_sdg_snapshot ?? 650);
+                $step = $this->pricingService->getRoundingStepSdg();
+                $unitPriceSdg = $this->pricingService->convertAedToSdg((int) $item->unit_price_aed, $rate, $step);
+                $lineTotalSdg = $unitPriceSdg * (int) $item->quantity;
+            }
+
             return [
                 'id'             => $item->id,
                 'product_id'     => $item->product_id,
@@ -500,6 +520,8 @@ class OrderService
                 'unit_price_aed' => (int) $item->unit_price_aed,
                 'quantity'       => (int) $item->quantity,
                 'line_total_aed' => (int) $item->line_total_aed,
+                'unit_price_sdg' => $unitPriceSdg,
+                'line_total_sdg' => $lineTotalSdg,
             ];
         }, $items);
 
@@ -677,6 +699,8 @@ class OrderService
                 'status_label'      => OrderStateMachine::getStatusLabel($order->status),
                 'delivery_type'     => $order->delivery_type,
                 'delivery_phone'    => $order->delivery_phone,
+                'rate_sdg_snapshot' => (int) $order->rate_sdg_snapshot,
+                'subtotal_aed'      => (int) $order->subtotal_aed,
                 'total_sdg'         => (int) $order->total_sdg,
                 'lock_expires_at'   => gmdate('Y-m-d\TH:i:s\Z', $expiresAt),
                 'seconds_remaining' => $secondsRemaining,

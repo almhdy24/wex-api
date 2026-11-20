@@ -13,5 +13,7 @@ class OrderItem extends Entity
         'unit_price_aed' => 'integer',
         'quantity'       => 'integer',
         'line_total_aed' => 'integer',
+        'unit_price_sdg' => 'integer',
+        'line_total_sdg' => 'integer',
     ];
 }

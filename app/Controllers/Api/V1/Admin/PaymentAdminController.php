@@ -4,6 +4,7 @@ namespace App\Controllers\Api\V1\Admin;
 
 use App\Controllers\Api\V1\BaseApiController;
 use App\Exceptions\ValidationFailedException;
+use App\Presenters\AdminOrderPresenter;
 use App\Services\PaymentProofService;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -51,6 +52,8 @@ class PaymentAdminController extends BaseApiController
             ? 'تم قبول إشعار التحويل البنكي وتأكيد الطلب بنجاح'
             : 'تم رفض إشعار التحويل البنكي وتحديث حالة الطلب';
 
-        return $this->respondSuccess($result, $msg);
+        $presented = AdminOrderPresenter::present($result);
+
+        return $this->respondSuccess($presented, $msg);
     }
 }

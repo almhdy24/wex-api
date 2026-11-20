@@ -222,9 +222,11 @@ This document outlines the relational schema, constraints, data types, and porta
 | product_id | INT(11) UNSIGNED | No | FK -> products.id (RESTRICT) |
 | product_name_snapshot | VARCHAR(191) | No | Name at purchase |
 | product_type_snapshot | VARCHAR(30) | No | Type at purchase |
-| unit_price_aed | INT(11) UNSIGNED | No | Integer AED unit price |
+| unit_price_aed | INT(11) UNSIGNED | No | Integer AED unit price (Admin only) |
 | quantity | INT(5) UNSIGNED | No | Quantity ordered |
-| line_total_aed | INT(11) UNSIGNED | No | unit_price * quantity |
+| line_total_aed | INT(11) UNSIGNED | No | unit_price_aed * quantity (Admin only) |
+| unit_price_sdg | INT(11) UNSIGNED | No | Snapshotted unit price in SDG (Customer visible) |
+| line_total_sdg | INT(11) UNSIGNED | No | unit_price_sdg * quantity (Customer visible) |
 
 ### `order_events`
 | Column | Type | Nullable | Description |

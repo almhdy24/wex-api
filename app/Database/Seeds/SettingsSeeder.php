@@ -12,6 +12,7 @@ class SettingsSeeder extends Seeder
 
         $settings = [
             ['key' => 'exchange_rate_sdg',      'value' => '650'],
+            ['key' => 'prices_updated_at',      'value' => $now],
             ['key' => 'lock_hours',              'value' => '4'],
             ['key' => 'app_discount_percent',    'value' => '3'],
             ['key' => 'rounding_step_sdg',       'value' => '100'],

@@ -81,6 +81,15 @@
   - End-to-end smoke testing with curl against running server
   - Clean clone validation check (migration refresh, seeding, CLI commands verified)
   - Release tag `v1.0.0`
+- [x] **Phase A: Admin-Only Exchange Rate & AED Isolation (hide-rate branch)**
+  - Migration `2026-11-20-000001_AddPricesUpdatedAtAndOrderItemSdgColumns`: added `unit_price_sdg` and `line_total_sdg` to `order_items`, backfilled existing items, added `prices_updated_at` to `settings`.
+  - `PricingService`: single source of truth for SDG item calculations and order totals, `calculateOrderItemPrices`, `calculateOrderTotals` using sum of line totals, and `getPricesUpdatedAt()`.
+  - `SettingService` & `ProductService`: audit hooks updating `prices_updated_at` on exchange rate changes or product AED price edits.
+  - Serializers/Transformers: `PublicProductPresenter` & `AdminProductPresenter`, `CustomerOrderPresenter` & `AdminOrderPresenter`. Whitelisted fields on customer/public presenters.
+  - `GET /api/v1/shop`: removed exchange rate and bank details; returns `lock_hours`, `app_discount_percent`, `prices_updated_at`, and shop metadata.
+  - Email templates & Arabic strings sanitized: zero mention of "سعر الصرف" or AED in customer-facing templates.
+  - Automated tests in `tests/feature/HideRateTest.php` (12 tests, 1,712 assertions) with recursive key scanner asserting zero leakage of `aed|rate|exchange|dirham` in public/customer endpoints, order totals equal sum of line totals, and order SDG immutability across rate changes.
+  - Total automated tests passing: 63 tests, 2,352 assertions (100% passing).
 
 
 ---

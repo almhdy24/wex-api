@@ -3,6 +3,7 @@
 namespace App\Controllers\Api\V1;
 
 use App\Exceptions\ValidationFailedException;
+use App\Presenters\CustomerOrderPresenter;
 use App\Services\OrderService;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -10,6 +11,7 @@ use CodeIgniter\HTTP\ResponseInterface;
  * OrderController
  *
  * Customer order management (create, list, view, cancel, reorder).
+ * Responses are filtered through CustomerOrderPresenter to expose only SDG amounts.
  */
 class OrderController extends BaseApiController
 {
@@ -35,8 +37,9 @@ class OrderController extends BaseApiController
         }
 
         $orderData = $this->orderService->createOrder((int) $user->id, $payload);
+        $presented = CustomerOrderPresenter::present($orderData);
 
-        return $this->respondSuccess($orderData, 'تم إنشاء الطلب بنجاح وتثبيت السعر', ResponseInterface::HTTP_CREATED);
+        return $this->respondSuccess($presented, 'تم إنشاء الطلب بنجاح وتثبيت السعر', ResponseInterface::HTTP_CREATED);
     }
 
     /**
@@ -50,9 +53,10 @@ class OrderController extends BaseApiController
         [$page, $perPage] = $this->getPaginationParams();
 
         $result = $this->orderService->listOrders((int) $user->id, $page, $perPage);
+        $presentedItems = CustomerOrderPresenter::presentCollection($result['items']);
 
         return $this->respondSuccess(
-            $result['items'],
+            $presentedItems,
             'قائمة طلباتك',
             ResponseInterface::HTTP_OK,
             $result['meta']
@@ -68,8 +72,9 @@ class OrderController extends BaseApiController
     {
         $user = $this->currentUser();
         $order = $this->orderService->getOrder($orderNumber, (int) $user->id);
+        $presented = CustomerOrderPresenter::present($order);
 
-        return $this->respondSuccess($order, 'تفاصيل الطلب');
+        return $this->respondSuccess($presented, 'تفاصيل الطلب');
     }
 
     /**
@@ -84,8 +89,9 @@ class OrderController extends BaseApiController
         $reason = $payload['reason'] ?? null;
 
         $order = $this->orderService->cancelOrder($orderNumber, (int) $user->id, $reason);
+        $presented = CustomerOrderPresenter::present($order);
 
-        return $this->respondSuccess($order, 'تم إلغاء الطلب بنجاح');
+        return $this->respondSuccess($presented, 'تم إلغاء الطلب بنجاح');
     }
 
     /**
@@ -97,7 +103,8 @@ class OrderController extends BaseApiController
     {
         $user = $this->currentUser();
         $newOrder = $this->orderService->reorder($orderNumber, (int) $user->id);
+        $presented = CustomerOrderPresenter::present($newOrder);
 
-        return $this->respondSuccess($newOrder, 'تم إنشاء طلب جديد من الطلب السابق', ResponseInterface::HTTP_CREATED);
+        return $this->respondSuccess($presented, 'تم إنشاء طلب جديد من الطلب السابق', ResponseInterface::HTTP_CREATED);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Controllers\Api\V1\Admin;
 use App\Controllers\Api\V1\BaseApiController;
 use App\Exceptions\ValidationFailedException;
 use App\Models\ProductModel;
+use App\Presenters\AdminProductPresenter;
 use App\Services\ProductService;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -42,9 +43,10 @@ class ProductAdminController extends BaseApiController
         }
 
         $result = $this->productService->listAdminProducts($filters, $page, $perPage);
+        $presentedItems = AdminProductPresenter::presentCollection($result['items']);
 
         return $this->respondPaginated(
-            items: $result['items'],
+            items: $presentedItems,
             page: $page,
             perPage: $perPage,
             total: $result['total'],
@@ -60,7 +62,7 @@ class ProductAdminController extends BaseApiController
         $body = $this->getJsonBody();
         $product = $this->productService->createProduct($body);
 
-        return $this->respondCreated($product, lang('Api.product_created'));
+        return $this->respondCreated(AdminProductPresenter::present($product), lang('Api.product_created'));
     }
 
     /**
@@ -73,7 +75,7 @@ class ProductAdminController extends BaseApiController
             return $this->respondError(lang('Api.product_not_found'), 404);
         }
 
-        return $this->respondSuccess($product, 'بيانات الجهاز');
+        return $this->respondSuccess(AdminProductPresenter::present($product), 'بيانات الجهاز');
     }
 
     /**
@@ -84,7 +86,7 @@ class ProductAdminController extends BaseApiController
         $body = $this->getJsonBody();
         $product = $this->productService->updateProduct($id, $body);
 
-        return $this->respondSuccess($product, lang('Api.product_updated'));
+        return $this->respondSuccess(AdminProductPresenter::present($product), lang('Api.product_updated'));
     }
 
     /**
@@ -110,7 +112,7 @@ class ProductAdminController extends BaseApiController
 
         $product = $this->productService->updateStock($id, (int) $body['stock_quantity']);
 
-        return $this->respondSuccess($product, 'تم تحديث كمية المخزون بنجاح');
+        return $this->respondSuccess(AdminProductPresenter::present($product), 'تم تحديث كمية المخزون بنجاح');
     }
 
     /**

@@ -29,6 +29,7 @@ class ProductService
     protected BrandModel $brandModel;
     protected PricingService $pricingService;
     protected SettingModel $settingModel;
+    protected SettingService $settingService;
 
     public function __construct(
         ?ProductModel $productModel = null,
@@ -37,7 +38,8 @@ class ProductService
         ?CategoryModel $categoryModel = null,
         ?BrandModel $brandModel = null,
         ?PricingService $pricingService = null,
-        ?SettingModel $settingModel = null
+        ?SettingModel $settingModel = null,
+        ?SettingService $settingService = null
     ) {
         $this->productModel   = $productModel ?? new ProductModel();
         $this->imageModel     = $imageModel ?? new ProductImageModel();
@@ -46,6 +48,7 @@ class ProductService
         $this->brandModel     = $brandModel ?? new BrandModel();
         $this->pricingService = $pricingService ?? new PricingService();
         $this->settingModel   = $settingModel ?? new SettingModel();
+        $this->settingService = $settingService ?? new SettingService();
     }
 
     /**
@@ -94,7 +97,21 @@ class ProductService
             $builder->where('condition', $filters['condition']);
         }
 
-        // Filter by Price Range in AED
+        // Filter by Price Range in SDG (internal conversion to AED)
+        if (isset($filters['min_price_sdg']) && is_numeric($filters['min_price_sdg'])) {
+            $minPriceSdg = (int) $filters['min_price_sdg'];
+            $rate = $this->pricingService->getCurrentRateSdg();
+            $minPriceAed = (int) floor($minPriceSdg / $rate);
+            $builder->where('price_aed >=', $minPriceAed);
+        }
+        if (isset($filters['max_price_sdg']) && is_numeric($filters['max_price_sdg'])) {
+            $maxPriceSdg = (int) $filters['max_price_sdg'];
+            $rate = $this->pricingService->getCurrentRateSdg();
+            $maxPriceAed = (int) ceil($maxPriceSdg / $rate);
+            $builder->where('price_aed <=', $maxPriceAed);
+        }
+
+        // Backward compatibility for AED filter if ever used internally
         if (isset($filters['min_price_aed']) && is_numeric($filters['min_price_aed'])) {
             $builder->where('price_aed >=', (int) $filters['min_price_aed']);
         }
@@ -197,10 +214,7 @@ class ProductService
             'short_description' => $product->short_description,
             'description'       => $product->description,
             'condition'         => $product->condition,
-            'price_aed'         => (int) $product->price_aed,
             'price_sdg'         => $this->pricingService->convertAedToSdg((int) $product->price_aed, $rateSdg),
-            'rate_sdg'          => $rateSdg,
-            'rate_updated_at'   => $rateUpdatedAt,
             'stock_status'      => $product->getStockStatus($lowThreshold),
             'warranty_text'     => $product->warranty_text,
             'specs'             => $product->getSpecs(),
@@ -240,10 +254,7 @@ class ProductService
             'name'              => $prod->name,
             'short_description' => $prod->short_description,
             'condition'         => $prod->condition,
-            'price_aed'         => (int) $prod->price_aed,
             'price_sdg'         => $this->pricingService->convertAedToSdg((int) $prod->price_aed, $rateSdg),
-            'rate_sdg'          => $rateSdg,
-            'rate_updated_at'   => $rateUpdatedAt,
             'stock_status'      => $prod->getStockStatus($lowThreshold),
             'is_featured'       => (bool) $prod->is_featured,
             'image'             => $primaryImage ? [
@@ -286,7 +297,6 @@ class ProductService
                 'type'              => $acc->type,
                 'name'              => $acc->name,
                 'short_description' => $acc->short_description,
-                'price_aed'         => (int) $acc->price_aed,
                 'price_sdg'         => $this->pricingService->convertAedToSdg((int) $acc->price_aed, $rateSdg),
                 'stock_status'      => $acc->getStockStatus($lowThreshold),
                 'image'             => $img ? [
@@ -369,6 +379,8 @@ class ProductService
             'updated_at'        => $now,
         ]);
 
+        $this->settingService->touchPricesUpdatedAt();
+
         return $this->productModel->find($id);
     }
 
@@ -411,6 +423,10 @@ class ProductService
             $updateFields['updated_at'] = gmdate('Y-m-d H:i:s');
             $this->productModel->update($id, $updateFields);
             $product = $this->productModel->find($id);
+
+            if (array_key_exists('price_aed', $updateFields)) {
+                $this->settingService->touchPricesUpdatedAt();
+            }
         }
 
         return $product;

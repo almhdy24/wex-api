@@ -37,12 +37,12 @@ final class CatalogTest extends CIUnitTestCase
         $this->assertSame(5, $body['meta']['per_page']);
         $this->assertSame(14, $body['meta']['total']);
 
-        // Check currency structure on item
+        // Check currency structure on item: customer sees ONLY SDG amounts, never AED or rate
         $item = $body['data'][0];
-        $this->assertArrayHasKey('price_aed', $item);
+        $this->assertArrayNotHasKey('price_aed', $item);
+        $this->assertArrayNotHasKey('rate_sdg', $item);
         $this->assertArrayHasKey('price_sdg', $item);
         $this->assertArrayHasKey('stock_status', $item);
-        $this->assertSame(650, $item['rate_sdg']);
     }
 
     public function testFilterProductsByType(): void

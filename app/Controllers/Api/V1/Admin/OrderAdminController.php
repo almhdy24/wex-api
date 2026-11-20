@@ -4,6 +4,7 @@ namespace App\Controllers\Api\V1\Admin;
 
 use App\Controllers\Api\V1\BaseApiController;
 use App\Exceptions\ValidationFailedException;
+use App\Presenters\AdminOrderPresenter;
 use App\Services\OrderService;
 use CodeIgniter\HTTP\ResponseInterface;
 use Config\Wex;
@@ -12,6 +13,7 @@ use Config\Wex;
  * OrderAdminController
  *
  * Admin and Staff management for customer orders, transitions, and price lock extensions.
+ * Responses are filtered through AdminOrderPresenter.
  */
 class OrderAdminController extends BaseApiController
 {
@@ -38,9 +40,10 @@ class OrderAdminController extends BaseApiController
         ];
 
         $result = $this->orderService->listAdminOrders($filters, $page, $perPage);
+        $presentedItems = AdminOrderPresenter::presentCollection($result['items']);
 
         return $this->respondSuccess(
-            $result['items'],
+            $presentedItems,
             'قائمة طلبات العملاء',
             ResponseInterface::HTTP_OK,
             $result['meta']
@@ -55,7 +58,9 @@ class OrderAdminController extends BaseApiController
     public function show(string $orderNumber): ResponseInterface
     {
         $order = $this->orderService->getOrder($orderNumber, null, true);
-        return $this->respondSuccess($order, 'تفاصيل الطلب');
+        $presented = AdminOrderPresenter::present($order);
+
+        return $this->respondSuccess($presented, 'تفاصيل الطلب');
     }
 
     /**
@@ -89,8 +94,9 @@ class OrderAdminController extends BaseApiController
             note: $note,
             extra: $payload
         );
+        $presented = AdminOrderPresenter::present($updated);
 
-        return $this->respondSuccess($updated, 'تم تحديث حالة الطلب بنجاح');
+        return $this->respondSuccess($presented, 'تم تحديث حالة الطلب بنجاح');
     }
 
     /**
@@ -111,7 +117,8 @@ class OrderAdminController extends BaseApiController
 
         $user = $this->currentUser();
         $updated = $this->orderService->extendLock($orderNumber, $hours, (int) $user->id);
+        $presented = AdminOrderPresenter::present($updated);
 
-        return $this->respondSuccess($updated, 'تم تمديد فترة حجز السعر بنجاح');
+        return $this->respondSuccess($presented, 'تم تمديد فترة حجز السعر بنجاح');
     }
 }

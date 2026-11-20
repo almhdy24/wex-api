@@ -81,32 +81,64 @@ class SettingService
 
     /**
      * Retrieve public shop configuration for mobile/web apps.
+     * Exchange rate and bank details are omitted for customers.
      */
     public function getPublicSettings(): array
     {
         $all = $this->getAllSettings();
 
-        // Get the latest exchange rate update timestamp
-        $rateRow = $this->settings->where('key', 'exchange_rate_sdg')->first();
-        $rateUpdatedAt = ($rateRow && !empty($rateRow->updated_at))
-            ? gmdate('Y-m-d\TH:i:s\Z', strtotime($rateRow->updated_at))
-            : gmdate('Y-m-d\TH:i:s\Z');
-
         return [
-            'shop_name'           => $all['shop_name'] ?? 'Wex Technology',
-            'shop_address'        => $all['shop_address'] ?? 'مول الواحة، الشهداء، أم درمان',
-            'shop_phone'          => $all['shop_phone'] ?? '',
-            'shop_whatsapp'       => $all['shop_whatsapp'] ?? '',
-            'working_hours'       => $all['working_hours'] ?? '',
-            'bank_name'           => $all['bank_name'] ?? 'بنك الخرطوم (تطبيق بنكك)',
-            'bank_account_name'   => $all['bank_account_name'] ?? 'Wex Technology',
-            'bank_account_number' => $all['bank_account_number'] ?? '',
-            'exchange_rate_sdg'   => (int) ($all['exchange_rate_sdg'] ?? 650),
-            'rate_updated_at'     => $rateUpdatedAt,
-            'lock_hours'          => (int) ($all['lock_hours'] ?? 4),
-            'app_discount_percent'=> (int) ($all['app_discount_percent'] ?? 3),
-            'rounding_step_sdg'   => (int) ($all['rounding_step_sdg'] ?? 100),
+            'shop_name'            => $all['shop_name'] ?? 'Wex Technology',
+            'shop_address'         => $all['shop_address'] ?? 'مول الواحة، الشهداء، أم درمان',
+            'shop_phone'           => $all['shop_phone'] ?? '',
+            'shop_whatsapp'        => $all['shop_whatsapp'] ?? '',
+            'working_hours'        => $all['working_hours'] ?? '',
+            'lock_hours'           => (int) ($all['lock_hours'] ?? 4),
+            'app_discount_percent' => (int) ($all['app_discount_percent'] ?? 3),
+            'prices_updated_at'    => $this->getPricesUpdatedAt(),
         ];
+    }
+
+    /**
+     * Records a new timestamp whenever exchange rate or product price_aed changes.
+     */
+    public function touchPricesUpdatedAt(): string
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        $row = $this->settings->where('key', 'prices_updated_at')->first();
+        if ($row) {
+            $this->settings->where('key', 'prices_updated_at')->set([
+                'value'      => $now,
+                'updated_at' => $now,
+            ])->update();
+        } else {
+            $this->settings->insert([
+                'key'        => 'prices_updated_at',
+                'value'      => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        return gmdate('Y-m-d\TH:i:s\Z', strtotime($now));
+    }
+
+    /**
+     * Retrieves the latest prices_updated_at UTC ISO timestamp.
+     */
+    public function getPricesUpdatedAt(): string
+    {
+        $row = $this->settings->where('key', 'prices_updated_at')->first();
+        if ($row && !empty($row->value)) {
+            $ts = strtotime($row->value);
+            return $ts ? gmdate('Y-m-d\TH:i:s\Z', $ts) : gmdate('Y-m-d\TH:i:s\Z');
+        }
+
+        $rateRow = $this->settings->where('key', 'exchange_rate_sdg')->first();
+        if ($rateRow && !empty($rateRow->updated_at)) {
+            return gmdate('Y-m-d\TH:i:s\Z', strtotime($rateRow->updated_at));
+        }
+
+        return gmdate('Y-m-d\TH:i:s\Z');
     }
 
     /**
@@ -255,6 +287,9 @@ class SettingService
             ],
             $ip
         );
+
+        // Touch prices_updated_at
+        $this->touchPricesUpdatedAt();
 
         return [
             'rate_sdg'   => $rateSdg,
