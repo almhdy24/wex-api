@@ -46,6 +46,10 @@ class SettingService
         'social_instagram',
         'footer_text',
         'delivery_notes',
+        'policy_inspection',
+        'policy_inspection_title',
+        'policy_pickup',
+        'policy_return',
     ];
 
     public function __construct(
@@ -130,7 +134,11 @@ class SettingService
             'social_facebook'         => (string) ($all['social_facebook'] ?? ''),
             'social_instagram'        => (string) ($all['social_instagram'] ?? ''),
             'footer_text'             => (string) ($all['footer_text'] ?? ''),
-            'delivery_notes'          => (string) ($all['delivery_notes'] ?? ''),
+            'delivery_notes'          => (string) ($all['delivery_notes'] ?? 'التوصيل متاح داخل ولاية الخرطوم والولايات الآمنة مع إمكانية الفحص والمعاينة عند الاستلام.'),
+            'policy_inspection_title' => (string) ($all['policy_inspection_title'] ?? 'المعاينة وفحص الأجهزة'),
+            'policy_inspection'       => (string) ($all['policy_inspection'] ?? 'أجهزة مستوردة؛ يفحص العميل الجهاز ويعاينه بنفسه بدقة عند الاستلام في المتجر للتأكد من الحالة وسلامة كافة المكونات قبل إتمام الشراء.'),
+            'policy_pickup'           => (string) ($all['policy_pickup'] ?? 'يمكنك تشغيل الجهاز وفحصه بنفسك بمقرنا في مول الواحة، الشهداء، أم درمان قبل سداد أي مبلغ.'),
+            'policy_return'           => (string) ($all['policy_return'] ?? 'نظراً لطبيعة الأجهزة المستوردة وعدم وجود وكيل محلي، لا يتوفر ضمان مصنعي أو استبدال بعد الاستلام والفحص المباشر.'),
             'lock_hours'              => (int) ($all['lock_hours'] ?? 4),
             'app_discount_percent'    => (int) ($all['app_discount_percent'] ?? 3),
             'orders_enabled'          => (bool) $ordersEnabled,

@@ -41,7 +41,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 5,
                 'is_active'         => 1,
                 'is_featured'       => 1,
-                'warranty_text'     => 'ضمان المحل 3 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'لابتوب مكتبي خفيف للأعمال اليومية',
                 'description'       => 'مناسب للشغل المكتبي والتصفح والدراسة، هيكل متين ومريح في التنقل.',
                 'specs'             => json_encode([
@@ -63,7 +63,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 4,
                 'is_active'         => 1,
                 'is_featured'       => 1,
-                'warranty_text'     => 'ضمان المحل 3 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'جهاز عملي ومناسب للمبرمجين والمحاسبين',
                 'description'       => 'أداء مستقر وبطارية مزدوجة ولوحة مفاتيح مريحة جداً للكتابة الطويلة.',
                 'specs'             => json_encode([
@@ -85,7 +85,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 3,
                 'is_active'         => 1,
                 'is_featured'       => 1,
-                'warranty_text'     => 'ضمان المحل 3 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'هيكل ألمنيوم أنيق وخفيف للعمل والدراسة',
                 'description'       => 'تصميم عصري وصوت نقي من Bang & Olufsen مناسب للاجتماعات والمكتب.',
                 'specs'             => json_encode([
@@ -107,7 +107,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 2,
                 'is_active'         => 1,
                 'is_featured'       => 1,
-                'warranty_text'     => 'ضمان سنة كاملة',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'شاشة كبيرة مع لوحة أرقام جانبية',
                 'description'       => 'مناسب للحسابات والأعمال المكتبية التي تحتاج شاشة عريضة ومساحة مريحة.',
                 'specs'             => json_encode([
@@ -129,7 +129,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 6,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان سنة كاملة',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'سعة تخزين كبيرة ومناسب للطلاب',
                 'description'       => 'جهاز مناسب للأبحاث والدراسة الجامعية والاستخدام المنزلي بسعة 1 تيرابايت.',
                 'specs'             => json_encode([
@@ -151,7 +151,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 4,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان سنة كاملة',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'معالج الجيل العاشر مع هارد سريع',
                 'description'       => 'أداء سريع وإقلاع فوري للنظام والبرامج مع شاشة واضحة الألوان.',
                 'specs'             => json_encode([
@@ -173,7 +173,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 2,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان المحل 3 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'شاشة ريتنا عالية الدقة ووزن خفيف جداً',
                 'description'       => 'مناسب للتصفح والكتابة والتنقل مع شاشة ريتنا وبصمة Touch ID.',
                 'specs'             => json_encode([
@@ -195,7 +195,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 3,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان سنة كاملة',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'كرت شاشة منفصل للألعاب والتصميم',
                 'description'       => 'تبريد مزدوج وشاشة سريعة 144 هيرتز مناسبة للألعاب والمونتاج والهندسة.',
                 'specs'             => json_encode([
@@ -238,7 +238,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 20,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان شهرين',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'ماوس لاسلكي مريح وعملي',
                 'description'       => 'مدى اتصال 10 أمتار وبطارية تدوم طويلاً، متوافق مع كافة الأنظمة.',
                 'specs'             => json_encode([
@@ -276,7 +276,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 12,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان 3 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'شاحن بديل عالي الجودة مع كابل الكهرباء',
                 'description'       => 'شاحن أصلي لحماية بطارية الجهاز من تذبذب التيار.',
                 'specs'             => json_encode([
@@ -295,7 +295,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 15,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان 6 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'ترقية سرعة الإقلاع والبرامج',
                 'description'       => 'هارد سريع لتحسين أداء اللابتوبات القديمة والجديدة بمعدل قراءة عالي.',
                 'specs'             => json_encode([
@@ -314,7 +314,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 10,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان 6 شهور',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'رام لتسريع الجهاز وتعدد المهام',
                 'description'       => 'شريحة رام أصلية لرفع كفاءة اللابتوب وسلاسة فتح البرامج المتزامنة.',
                 'specs'             => json_encode([
@@ -333,7 +333,7 @@ class ProductsSeeder extends Seeder
                 'stock_quantity'    => 8,
                 'is_active'         => 1,
                 'is_featured'       => 0,
-                'warranty_text'     => 'ضمان شهر',
+                'warranty_text'     => 'معاينة وفحص عند الاستلام',
                 'short_description' => 'قاعدة مريحة للتبريد وتقليل الحرارة',
                 'description'       => 'مروحتان هادئتان تعملان عبر منفذ USB مع زوايا ارتفاع قابلة للتعديل.',
                 'specs'             => json_encode([
