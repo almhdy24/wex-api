@@ -74,6 +74,19 @@ final class OrderTest extends CIUnitTestCase
         $this->otherCustomerToken = $tokenService->generateAccessToken($other)['access_token'];
     }
 
+    protected function tearDown(): void
+    {
+        $_FILES = [];
+        $_POST  = [];
+        if (function_exists('service')) {
+            service('superglobals')->setFilesArray([]);
+            \Config\Services::resetSingle('superglobals');
+            \Config\Services::resetSingle('request');
+            \Config\Services::resetSingle('incomingrequest');
+        }
+        parent::tearDown();
+    }
+
     public function testCreateOrderPickupWithAtomicStockReservation(): void
     {
         $productModel = new ProductModel();

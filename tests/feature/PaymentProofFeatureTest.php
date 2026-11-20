@@ -37,6 +37,14 @@ final class PaymentProofFeatureTest extends CIUnitTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $_FILES = [];
+        $_POST  = [];
+        if (function_exists('service')) {
+            service('superglobals')->setFilesArray([]);
+            \Config\Services::resetSingle('superglobals');
+            \Config\Services::resetSingle('request');
+            \Config\Services::resetSingle('incomingrequest');
+        }
 
         $tokenService = new TokenService();
         $userModel    = new UserModel();
@@ -70,6 +78,19 @@ final class PaymentProofFeatureTest extends CIUnitTestCase
         }
         $this->otherCustomer      = $other;
         $this->otherCustomerToken = $tokenService->generateAccessToken($other)['access_token'];
+    }
+
+    protected function tearDown(): void
+    {
+        $_FILES = [];
+        $_POST  = [];
+        if (function_exists('service')) {
+            service('superglobals')->setFilesArray([]);
+            \Config\Services::resetSingle('superglobals');
+            \Config\Services::resetSingle('request');
+            \Config\Services::resetSingle('incomingrequest');
+        }
+        parent::tearDown();
     }
 
     protected function createOrder(int $userId, string $status = 'pending_payment', int $lockOffset = 3600): Order
