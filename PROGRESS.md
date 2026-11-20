@@ -205,3 +205,15 @@
   - Replacement support: when order is in `payment_review` and price lock is active, customer re-upload replaces prior pending proof (marked `replaced`), inserts new proof as `pending`, and logs timeline event.
   - Verified 12 reproduction cases with curl against running server; added PHPUnit unit and feature tests.
 
+---
+
+## Phase B: Invented Claims Removal (API)
+- **Status**: Completed
+- **Changes**:
+  - Removed all invented warranty text from `ProductsSeeder.php` (`warranty_text` defaulted to `null` across all products).
+  - Cleaned default settings and seeders: purged "ضمان معتمد", "فحص واختبار", "فحص مخبري", "وكيل تجاري/رسمي", "التوصيل الآمن", "قبل سداد أي مبلغ".
+  - Added new policy settings keys: `inspection_note`, `returns_note`, and `extra_delivery_note` in `SettingService.php` and `SettingsController.php`.
+  - Replaced unverified wording in transactional email templates (`payment_approved.php`, `lock_warning.php`, `order_expired.php`).
+  - Added PHPUnit automated claims scanner: `tests/unit/ClaimsScannerTest.php` enforcing zero invented claims across Views, Seeders, and Controllers.
+
+

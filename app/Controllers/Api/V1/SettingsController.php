@@ -50,11 +50,14 @@ class SettingsController extends BaseApiController
             'lock_hours'              => isset($map['lock_hours']) ? (int) $map['lock_hours'] : 4,
             'app_discount_percent'    => isset($map['app_discount_percent']) ? (int) $map['app_discount_percent'] : 3,
             'prices_updated_at'       => $pricesUpdatedAt,
-            'delivery_notes'          => $map['delivery_notes'] ?? 'التوصيل متاح داخل ولاية الخرطوم والولايات الآمنة مع إمكانية الفحص والمعاينة عند الاستلام.',
-            'policy_inspection_title' => $map['policy_inspection_title'] ?? 'المعاينة وفحص الأجهزة',
-            'policy_inspection'       => $map['policy_inspection'] ?? 'أجهزة مستوردة؛ يفحص العميل الجهاز ويعاينه بنفسه بدقة عند الاستلام في المتجر للتأكد من الحالة وسلامة كافة المكونات قبل إتمام الشراء.',
-            'policy_pickup'           => $map['policy_pickup'] ?? 'يمكنك تشغيل الجهاز وفحصه بنفسك بمقرنا في مول الواحة، الشهداء، أم درمان قبل سداد أي مبلغ.',
-            'policy_return'           => $map['policy_return'] ?? 'نظراً لطبيعة الأجهزة المستوردة وعدم وجود وكيل محلي، لا يتوفر ضمان مصنعي أو استبدال بعد الاستلام والفحص المباشر.',
+            'delivery_notes'          => $map['delivery_notes'] ?? ($map['extra_delivery_note'] ?? 'التوصيل متاح داخل ولاية الخرطوم والولايات المحددة.'),
+            'extra_delivery_note'     => $map['extra_delivery_note'] ?? ($map['delivery_notes'] ?? null),
+            'policy_inspection_title' => $map['policy_inspection_title'] ?? 'معاينة الأجهزة',
+            'policy_inspection'       => $map['policy_inspection'] ?? ($map['inspection_note'] ?? 'أجهزة مستوردة؛ يعاين العميل الجهاز بنفسه عند الاستلام في المتجر.'),
+            'inspection_note'         => $map['inspection_note'] ?? ($map['policy_inspection'] ?? null),
+            'policy_pickup'           => $map['policy_pickup'] ?? 'يمكنك استلام الجهاز من مقرنا في مول الواحة، الشهداء، أم درمان.',
+            'policy_return'           => $map['policy_return'] ?? ($map['returns_note'] ?? 'نظراً لطبيعة الأجهزة المستوردة، يتم الاستلام بعد المعاينة المباشرة.'),
+            'returns_note'            => $map['returns_note'] ?? ($map['policy_return'] ?? null),
         ];
 
         return $this->respondSuccess($data, 'معلومات المتجر');

@@ -343,7 +343,7 @@ class OrderService
                 'from_status'   => Wex::ORDER_STATUS_PENDING_PAYMENT,
                 'to_status'     => Wex::ORDER_STATUS_EXPIRED,
                 'actor_user_id' => null, // system
-                'note'          => 'انتهت فترة حجز السعر المحددة للطلب وتم إلغاء الحجز واسترجاع المنتجات للمخزون.',
+                'note'          => 'انتهت فترة حجز السعر المحددة للطلب وتم إلغاء الحجز وإعادة المنتجات إلى المخزون.',
                 'created_at'    => $nowStr,
             ]));
 
