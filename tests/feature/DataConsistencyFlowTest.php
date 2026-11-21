@@ -90,6 +90,16 @@ final class DataConsistencyFlowTest extends CIUnitTestCase
             'created_at' => gmdate('Y-m-d H:i:s'),
         ]);
 
+        $eventModel = new OrderEventModel();
+        $eventModel->insert([
+            'order_id' => $id,
+            'from_status' => null,
+            'to_status' => $status,
+            'status_text' => 'في انتظار التحويل البنكي',
+            'note' => 'تم إنشاء الطلب وتثبيت السعر',
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
         return $orderModel->find($id);
     }
 
@@ -162,6 +172,7 @@ final class DataConsistencyFlowTest extends CIUnitTestCase
 
         $body = json_decode($result->getJSON(), true);
         $timeline = $body['data']['timeline'] ?? [];
+        $this->assertNotEmpty($timeline, 'Timeline events must not be empty');
 
         foreach ($timeline as $event) {
             $this->assertStringNotContainsString('UTC', $event['note'] ?? '');

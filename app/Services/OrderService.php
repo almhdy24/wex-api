@@ -263,12 +263,18 @@ class OrderService
             }
 
             // Insert initial timeline event
+            $eventMeta = [
+                'lock_hours'      => (int) $lockHours,
+                'lock_expires_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime($lockExpiresAt)),
+            ];
             $this->orderEvents->insert(new OrderEvent([
                 'order_id'      => $orderId,
                 'from_status'   => null,
                 'to_status'     => Wex::ORDER_STATUS_PENDING_PAYMENT,
                 'actor_user_id' => $userId,
-                'note'          => "تم إنشاء الطلب وتثبيت السعر لمدة {$lockHours} ساعات حتى " . gmdate('H:i', strtotime($lockExpiresAt)) . ' UTC',
+                'event_type'    => 'order_created',
+                'meta'          => json_encode($eventMeta),
+                'note'          => "تم إنشاء الطلب وتثبيت السعر لمدة {$lockHours} ساعات",
                 'created_at'    => gmdate('Y-m-d H:i:s', $nowTime),
             ]));
 
@@ -291,7 +297,7 @@ class OrderService
                     'order_number'        => $orderNumber,
                     'delivery_type'       => $orderType,
                     'total_sdg'           => $totals['total_sdg'],
-                    'lock_expires_at'     => gmdate('Y-m-d H:i', strtotime($lockExpiresAt)) . ' UTC',
+                    'lock_expires_at'     => gmdate('Y-m-d H:i', strtotime($lockExpiresAt)),
                     'bank_account_name'   => $this->settingService->get('bank_account_name'),
                     'bank_account_number' => $this->settingService->get('bank_account_number'),
                 ]
@@ -343,6 +349,8 @@ class OrderService
                 'from_status'   => Wex::ORDER_STATUS_PENDING_PAYMENT,
                 'to_status'     => Wex::ORDER_STATUS_EXPIRED,
                 'actor_user_id' => null, // system
+                'event_type'    => 'order_expired',
+                'meta'          => json_encode(['reason' => 'lock_expired']),
                 'note'          => 'انتهت فترة حجز السعر المحددة للطلب وتم إلغاء الحجز وإعادة المنتجات إلى المخزون.',
                 'created_at'    => $nowStr,
             ]));
@@ -550,12 +558,19 @@ class OrderService
             ->findAll();
 
         $formattedEvents = array_map(function (OrderEvent $e) {
+            $metaData = null;
+            if (!empty($e->meta)) {
+                $metaData = is_string($e->meta) ? json_decode($e->meta, true) : $e->meta;
+            }
             return [
-                'id'          => $e->id,
+                'id'          => (int) $e->id,
                 'from_status' => $e->from_status,
                 'to_status'   => $e->to_status,
                 'status_text' => OrderStateMachine::getStatusLabel($e->to_status),
-                'note'        => $e->note,
+                'type'        => (string) ($e->event_type ?: 'status_changed'),
+                'event_type'  => (string) ($e->event_type ?: 'status_changed'),
+                'meta'        => $metaData,
+                'note'        => (string) $e->note,
                 'created_at'  => $e->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($e->created_at)) : null,
             ];
         }, $events);
@@ -568,16 +583,40 @@ class OrderService
 
         $formattedProofs = array_map(function ($p) use ($order) {
             return [
-                'id'               => $p->id,
-                'status'           => $p->status,
+                'id'               => (int) $p->id,
+                'status'           => (string) $p->status,
                 'sender_name'      => $p->sender_name,
                 'reference_number' => $p->reference_number,
                 'review_note'      => $p->review_note,
                 'image_url'        => "/api/v1/orders/{$order->order_number}/payment-proof/{$p->id}/image",
                 'created_at'       => $p->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->created_at)) : null,
+                'uploaded_at'      => $p->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->created_at)) : null,
                 'reviewed_at'      => $p->reviewed_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->reviewed_at)) : null,
             ];
         }, $proofs);
+
+        // Compute unified payment state block
+        $paymentBlock = PaymentStateService::computePaymentBlock($order, $formattedProofs);
+
+        // Resolve customer details
+        $userObj = $order->user_id ? $this->users->find((int) $order->user_id) : null;
+        $customerName = trim((string) ($userObj?->name ?? ''));
+        if ($customerName === '') {
+            $customerName = trim((string) ($order->delivery_name ?? ''));
+        }
+        if ($customerName === '') {
+            $customerName = trim((string) ($userObj?->phone ?? $order->delivery_phone ?? ''));
+        }
+        if ($customerName === '') {
+            $email = (string) ($userObj?->email ?? '');
+            if ($email !== '' && str_contains($email, '@')) {
+                $customerName = explode('@', $email)[0];
+            }
+        }
+        if ($customerName === '') {
+            $customerName = 'مستخدم #' . ($userObj?->id ?? $order->user_id);
+        }
+        $customerPhone = trim((string) ($userObj?->phone ?? $order->delivery_phone ?? ''));
 
         // Calculate lock seconds remaining
         $now = time();
@@ -612,12 +651,27 @@ class OrderService
 
         return [
             'order_number'                  => $order->order_number,
+            'user_id'                       => (int) $order->user_id,
+            'customer_name'                 => $customerName,
+            'customer_phone'                => $customerPhone,
+            'customer'                      => [
+                'name'  => $customerName,
+                'phone' => $customerPhone,
+                'email' => $userObj?->email ?? null,
+            ],
+            'user'                          => $userObj ? [
+                'id'    => (int) $userObj->id,
+                'name'  => $customerName,
+                'email' => $userObj->email,
+                'phone' => $customerPhone,
+            ] : null,
             'status'                        => $order->status,
             'status_label'                  => OrderStateMachine::getStatusLabel($order->status),
             'delivery_type'                 => $order->delivery_type,
             'delivery_phone'                => $order->delivery_phone,
             'delivery_address'              => $order->delivery_address,
             'customer_note'                 => $order->customer_note,
+            'payment'                       => $paymentBlock,
             'rate_sdg_snapshot'             => (int) $order->rate_sdg_snapshot,
             'app_discount_percent_snapshot' => (int) $order->app_discount_percent_snapshot,
             'subtotal_aed'                  => (int) $order->subtotal_aed,
@@ -635,6 +689,7 @@ class OrderService
             'payment_general_notes'         => (string) $this->settingService->get('payment_general_notes', ''),
             'items'                         => $formattedItems,
             'timeline'                      => $formattedEvents,
+            'proofs'                        => $formattedProofs,
             'payment_proofs'                => $formattedProofs,
             'created_at'                    => $order->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($order->created_at)) : null,
             'updated_at'                    => $order->updated_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($order->updated_at)) : null,
@@ -655,9 +710,21 @@ class OrderService
 
         $orders = $builder->orderBy('id', 'DESC')->findAll($perPage, $offset);
 
+        $orderIds = array_map(static fn($o) => (int) $o->id, $orders);
+        $proofsByOrderId = [];
+        if (!empty($orderIds)) {
+            $proofRows = $this->paymentProofs->whereIn('order_id', $orderIds)->orderBy('id', 'DESC')->findAll();
+            foreach ($proofRows as $p) {
+                $proofsByOrderId[$p->order_id][] = $p;
+            }
+        }
+
         $items = [];
         foreach ($orders as $order) {
             $this->refreshExpiry($order);
+
+            $orderProofs = $proofsByOrderId[$order->id] ?? [];
+            $paymentBlock = PaymentStateService::computePaymentBlock($order, $orderProofs);
 
             $expiresAt = strtotime($order->lock_expires_at);
             $secondsRemaining = ($order->status === Wex::ORDER_STATUS_PENDING_PAYMENT)
@@ -669,8 +736,11 @@ class OrderService
                 'status'            => $order->status,
                 'status_label'      => OrderStateMachine::getStatusLabel($order->status),
                 'delivery_type'     => $order->delivery_type,
+                'payment'           => $paymentBlock,
                 'total_sdg'         => (int) $order->total_sdg,
+                'total_amount_sdg'  => (int) $order->total_sdg,
                 'lock_expires_at'   => gmdate('Y-m-d\TH:i:s\Z', $expiresAt),
+                'expires_at'        => gmdate('Y-m-d\TH:i:s\Z', $expiresAt),
                 'seconds_remaining' => $secondsRemaining,
                 'created_at'        => $order->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($order->created_at)) : null,
             ];
@@ -739,6 +809,7 @@ class OrderService
                     'reference_number' => $p->reference_number,
                     'review_note'      => $p->review_note,
                     'created_at'       => $p->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->created_at)) : null,
+                    'uploaded_at'      => $p->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->created_at)) : null,
                     'reviewed_at'      => $p->reviewed_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->reviewed_at)) : null,
                 ];
             }
@@ -754,14 +825,32 @@ class OrderService
                 : 0;
 
             $userObj = $usersById[$order->user_id] ?? null;
-            $customerName = $userObj?->name ?: ($order->delivery_name ?: ($userObj?->phone ?: ($order->delivery_phone ?: '')));
-            $customerPhone = $userObj?->phone ?: ($order->delivery_phone ?: '');
+            $customerName = trim((string) ($userObj?->name ?? ''));
+            if ($customerName === '') {
+                $customerName = trim((string) ($order->delivery_name ?? ''));
+            }
+            if ($customerName === '') {
+                $customerName = trim((string) ($userObj?->phone ?? $order->delivery_phone ?? ''));
+            }
+            if ($customerName === '') {
+                $email = (string) ($userObj?->email ?? '');
+                if ($email !== '' && str_contains($email, '@')) {
+                    $customerName = explode('@', $email)[0];
+                }
+            }
+            if ($customerName === '') {
+                $customerName = 'مستخدم #' . ($userObj?->id ?? $order->user_id);
+            }
+            $customerPhone = trim((string) ($userObj?->phone ?? $order->delivery_phone ?? ''));
 
             $orderProofs = $proofsByOrderId[$order->id] ?? [];
             foreach ($orderProofs as &$pr) {
                 $pr['image_url'] = "/api/v1/orders/{$order->order_number}/payment-proof/{$pr['id']}/image";
+                $pr['uploaded_at'] = $pr['created_at'] ?? null;
             }
             unset($pr);
+
+            $paymentBlock = PaymentStateService::computePaymentBlock($order, $orderProofs);
 
             $items[] = [
                 'id'                => (int) $order->id,
@@ -769,10 +858,16 @@ class OrderService
                 'user_id'           => (int) $order->user_id,
                 'customer_name'     => $customerName,
                 'customer_phone'    => $customerPhone,
+                'customer'          => [
+                    'name'  => $customerName,
+                    'phone' => $customerPhone,
+                    'email' => $userObj?->email ?? null,
+                ],
                 'amount'            => (int) $order->total_sdg,
                 'expected_amount'   => (int) $order->total_sdg,
                 'payment_proofs'    => $orderProofs,
                 'proofs'            => $orderProofs,
+                'payment'           => $paymentBlock,
                 'status'            => $order->status,
                 'status_label'      => OrderStateMachine::getStatusLabel($order->status),
                 'delivery_type'     => $order->delivery_type,
@@ -782,6 +877,7 @@ class OrderService
                 'total_sdg'         => (int) $order->total_sdg,
                 'total_amount_sdg'  => (int) $order->total_sdg,
                 'lock_expires_at'   => gmdate('Y-m-d\TH:i:s\Z', $expiresAt),
+                'expires_at'        => gmdate('Y-m-d\TH:i:s\Z', $expiresAt),
                 'seconds_remaining' => $secondsRemaining,
                 'created_at'        => $order->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($order->created_at)) : null,
             ];
@@ -850,11 +946,17 @@ class OrderService
 
             // Timeline event
             $eventNote = $note ?? ('تم تغيير حالة الطلب إلى: ' . OrderStateMachine::getStatusLabel($newStatus));
+            $eventMeta = [
+                'from_status' => $fromStatus,
+                'to_status'   => $newStatus,
+            ];
             $this->orderEvents->insert(new OrderEvent([
                 'order_id'      => $order->id,
                 'from_status'   => $fromStatus,
                 'to_status'     => $newStatus,
                 'actor_user_id' => $actorUserId,
+                'event_type'    => 'status_changed',
+                'meta'          => json_encode($eventMeta),
                 'note'          => $eventNote,
                 'created_at'    => $nowStr,
             ]));
@@ -956,14 +1058,96 @@ class OrderService
             'updated_at'      => gmdate('Y-m-d H:i:s'),
         ]);
 
+        $eventMeta = [
+            'extra_hours'     => (int) $extraHours,
+            'lock_expires_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime($newExpiry)),
+        ];
+
         $this->orderEvents->insert(new OrderEvent([
             'order_id'      => $order->id,
             'from_status'   => $order->status,
             'to_status'     => $order->status,
             'actor_user_id' => $actorUserId,
-            'note'          => "قام المشرف بتمديد فترة حجز السعر لمدة {$extraHours} ساعات إضافية حتى " . gmdate('H:i', strtotime($newExpiry)) . ' UTC',
+            'event_type'    => 'lock_extended',
+            'meta'          => json_encode($eventMeta),
+            'note'          => "قام المشرف بتمديد فترة حجز السعر لمدة {$extraHours} ساعات إضافية",
             'created_at'    => gmdate('Y-m-d H:i:s'),
         ]));
+
+        return $this->getOrder($orderNumber, null, true);
+    }
+
+    /**
+     * Admin/Staff recovers an orphan order stuck in payment_review with zero proofs.
+     *
+     * @throws NotFoundException|ConflictException
+     */
+    public function resetOrphanOrder(string $orderNumber, int $actorUserId): array
+    {
+        $order = $this->orders->where('order_number', $orderNumber)->first();
+        if (!$order) {
+            throw new NotFoundException('الطلب غير موجود.');
+        }
+
+        if ($order->status !== Wex::ORDER_STATUS_PAYMENT_REVIEW) {
+            throw new ConflictException('الطلب ليس في حالة مراجعة الدفع.');
+        }
+
+        $pendingCount = $this->paymentProofs->where('order_id', $order->id)->where('status', Wex::PROOF_STATUS_PENDING)->countAllResults();
+        if ($pendingCount > 0) {
+            throw new ConflictException('الطلب يحتوي على إشعار دفع قيد المراجعة ولا يعتبر يتيماً.');
+        }
+
+        $now = time();
+        $expiresAt = strtotime($order->lock_expires_at);
+        $nowStr = gmdate('Y-m-d H:i:s');
+        $db = Database::connect();
+        $db->transBegin();
+
+        try {
+            if ($expiresAt > $now) {
+                $newStatus = Wex::ORDER_STATUS_PENDING_PAYMENT;
+                $this->orders->update($order->id, [
+                    'status'     => $newStatus,
+                    'updated_at' => $nowStr,
+                ]);
+
+                $this->orderEvents->insert(new OrderEvent([
+                    'order_id'      => $order->id,
+                    'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
+                    'to_status'     => $newStatus,
+                    'actor_user_id' => $actorUserId,
+                    'event_type'    => 'orphan_order_reset',
+                    'meta'          => json_encode(['reason' => 'zero_proofs_in_review']),
+                    'note'          => 'إعادة الطلب إلى بانتظار التحويل لعدم وجود إشعار مرفوع',
+                    'created_at'    => $nowStr,
+                ]));
+            } else {
+                $newStatus = Wex::ORDER_STATUS_EXPIRED;
+                $this->orders->update($order->id, [
+                    'status'     => $newStatus,
+                    'updated_at' => $nowStr,
+                ]);
+
+                $this->restoreStockForOrder((int) $order->id);
+
+                $this->orderEvents->insert(new OrderEvent([
+                    'order_id'      => $order->id,
+                    'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
+                    'to_status'     => $newStatus,
+                    'actor_user_id' => $actorUserId,
+                    'event_type'    => 'orphan_order_expired',
+                    'meta'          => json_encode(['reason' => 'lock_expired_without_proof']),
+                    'note'          => 'إلغاء الطلب لانتهاء مهلة حجز السعر بدون إشعار دفع',
+                    'created_at'    => $nowStr,
+                ]));
+            }
+
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
 
         return $this->getOrder($orderNumber, null, true);
     }

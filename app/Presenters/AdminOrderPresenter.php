@@ -3,12 +3,13 @@
 namespace App\Presenters;
 
 use App\Entities\Order;
+use App\Services\PaymentStateService;
 
 /**
  * AdminOrderPresenter
  *
  * Full representation for admin and staff, including AED amounts,
- * exchange rate snapshots, item-level AED prices, and user details.
+ * exchange rate snapshots, item-level AED prices, customer contact, proofs, and payment state.
  */
 class AdminOrderPresenter
 {
@@ -25,6 +26,7 @@ class AdminOrderPresenter
                 'id'             => (int) ($iArr['id'] ?? 0),
                 'product_id'     => (int) ($iArr['product_id'] ?? 0),
                 'name'           => (string) ($iArr['name'] ?? $iArr['product_name_snapshot'] ?? ''),
+                'product_name'   => (string) ($iArr['name'] ?? $iArr['product_name_snapshot'] ?? ''),
                 'type'           => (string) ($iArr['type'] ?? $iArr['product_type_snapshot'] ?? ''),
                 'unit_price_aed' => (int) ($iArr['unit_price_aed'] ?? 0),
                 'quantity'       => (int) ($iArr['quantity'] ?? 1),
@@ -36,16 +38,24 @@ class AdminOrderPresenter
 
         $timeline = array_map(static function ($event) {
             $eArr = is_array($event) ? $event : $event->toArray();
+            $meta = $eArr['meta'] ?? null;
+            if (is_string($meta)) {
+                $meta = json_decode($meta, true);
+            }
             return [
                 'id'          => (int) ($eArr['id'] ?? 0),
                 'from_status' => $eArr['from_status'] ?? null,
                 'to_status'   => (string) ($eArr['to_status'] ?? ''),
                 'status_text' => (string) ($eArr['status_text'] ?? ''),
+                'type'        => (string) ($eArr['type'] ?? $eArr['event_type'] ?? 'status_changed'),
+                'event_type'  => (string) ($eArr['event_type'] ?? $eArr['type'] ?? 'status_changed'),
+                'meta'        => $meta,
                 'note'        => (string) ($eArr['note'] ?? ''),
                 'created_at'  => $eArr['created_at'] ?? null,
             ];
         }, $arr['timeline'] ?? []);
 
+        $rawProofs = $arr['proofs'] ?? $arr['payment_proofs'] ?? [];
         $proofs = array_map(static function ($p) {
             $pArr = is_array($p) ? $p : $p->toArray();
             return [
@@ -56,9 +66,10 @@ class AdminOrderPresenter
                 'review_note'      => $pArr['review_note'] ?? null,
                 'image_url'        => (string) ($pArr['image_url'] ?? ''),
                 'created_at'       => $pArr['created_at'] ?? null,
+                'uploaded_at'      => $pArr['uploaded_at'] ?? $pArr['created_at'] ?? null,
                 'reviewed_at'      => $pArr['reviewed_at'] ?? null,
             ];
-        }, $arr['payment_proofs'] ?? []);
+        }, $rawProofs);
 
         $bankDetails = isset($arr['bank_details']) && is_array($arr['bank_details']) ? [
             'bank_name'           => (string) ($arr['bank_details']['bank_name'] ?? ''),
@@ -68,9 +79,26 @@ class AdminOrderPresenter
             'order_number'        => (string) ($arr['bank_details']['order_number'] ?? ($arr['order_number'] ?? '')),
         ] : null;
 
+        $customerName = (string) ($arr['customer']['name'] ?? $arr['customer_name'] ?? $arr['user']['name'] ?? $arr['delivery_name'] ?? $arr['customer_phone'] ?? $arr['delivery_phone'] ?? '');
+        $customerPhone = (string) ($arr['customer']['phone'] ?? $arr['customer_phone'] ?? $arr['user']['phone'] ?? $arr['delivery_phone'] ?? '');
+
+        $customerBlock = [
+            'name'  => $customerName,
+            'phone' => $customerPhone,
+            'email' => $arr['customer']['email'] ?? $arr['user']['email'] ?? null,
+        ];
+
+        $paymentBlock = $arr['payment'] ?? PaymentStateService::computePaymentBlock($arr, $proofs);
+
         return [
             'order_number'                  => (string) ($arr['order_number'] ?? ''),
             'user_id'                       => isset($arr['user_id']) ? (int) $arr['user_id'] : null,
+            'customer'                      => $customerBlock,
+            'customer_name'                 => $customerName,
+            'customer_phone'                => $customerPhone,
+            'payment'                       => $paymentBlock,
+            'proofs'                        => $proofs,
+            'payment_proofs'                => $proofs,
             'status'                        => (string) ($arr['status'] ?? ''),
             'status_label'                  => (string) ($arr['status_label'] ?? ''),
             'delivery_type'                 => (string) ($arr['delivery_type'] ?? ''),
@@ -97,7 +125,6 @@ class AdminOrderPresenter
             'payment_general_notes'         => (string) ($arr['payment_general_notes'] ?? ''),
             'items'                         => $items,
             'timeline'                      => $timeline,
-            'payment_proofs'                => $proofs,
             'user'                          => $arr['user'] ?? null,
             'created_at'                    => $arr['created_at'] ?? null,
             'updated_at'                    => $arr['updated_at'] ?? null,
@@ -111,16 +138,45 @@ class AdminOrderPresenter
     {
         $arr = is_array($order) ? $order : $order->toArray();
 
+        $rawProofs = $arr['proofs'] ?? $arr['payment_proofs'] ?? [];
+        $proofs = array_map(static function ($p) {
+            $pArr = is_array($p) ? $p : $p->toArray();
+            return [
+                'id'               => (int) ($pArr['id'] ?? 0),
+                'status'           => (string) ($pArr['status'] ?? ''),
+                'sender_name'      => $pArr['sender_name'] ?? null,
+                'reference_number' => $pArr['reference_number'] ?? null,
+                'review_note'      => $pArr['review_note'] ?? null,
+                'image_url'        => (string) ($pArr['image_url'] ?? ''),
+                'created_at'       => $pArr['created_at'] ?? null,
+                'uploaded_at'      => $pArr['uploaded_at'] ?? $pArr['created_at'] ?? null,
+                'reviewed_at'      => $pArr['reviewed_at'] ?? null,
+            ];
+        }, $rawProofs);
+
+        $customerName = (string) ($arr['customer']['name'] ?? $arr['customer_name'] ?? $arr['user']['name'] ?? $arr['delivery_name'] ?? $arr['customer_phone'] ?? $arr['delivery_phone'] ?? '');
+        $customerPhone = (string) ($arr['customer']['phone'] ?? $arr['customer_phone'] ?? $arr['user']['phone'] ?? $arr['delivery_phone'] ?? '');
+
+        $customerBlock = [
+            'name'  => $customerName,
+            'phone' => $customerPhone,
+            'email' => $arr['customer']['email'] ?? $arr['user']['email'] ?? null,
+        ];
+
+        $paymentBlock = $arr['payment'] ?? PaymentStateService::computePaymentBlock($arr, $proofs);
+
         return [
             'id'                => isset($arr['id']) ? (int) $arr['id'] : null,
             'order_number'      => (string) ($arr['order_number'] ?? ''),
             'user_id'           => isset($arr['user_id']) ? (int) $arr['user_id'] : null,
-            'customer_name'     => (string) ($arr['customer_name'] ?? $arr['user']['name'] ?? $arr['delivery_name'] ?? $arr['customer_phone'] ?? $arr['delivery_phone'] ?? ''),
-            'customer_phone'    => (string) ($arr['customer_phone'] ?? $arr['user']['phone'] ?? $arr['delivery_phone'] ?? ''),
+            'customer'          => $customerBlock,
+            'customer_name'     => $customerName,
+            'customer_phone'    => $customerPhone,
+            'payment'           => $paymentBlock,
             'amount'            => (int) ($arr['amount'] ?? $arr['total_sdg'] ?? 0),
             'expected_amount'   => (int) ($arr['expected_amount'] ?? $arr['total_sdg'] ?? 0),
-            'payment_proofs'    => $arr['payment_proofs'] ?? $arr['proofs'] ?? [],
-            'proofs'            => $arr['payment_proofs'] ?? $arr['proofs'] ?? [],
+            'payment_proofs'    => $proofs,
+            'proofs'            => $proofs,
             'status'            => (string) ($arr['status'] ?? ''),
             'status_label'      => (string) ($arr['status_label'] ?? ''),
             'delivery_type'     => (string) ($arr['delivery_type'] ?? ''),
@@ -141,6 +197,6 @@ class AdminOrderPresenter
      */
     public static function presentCollection(array $orders): array
     {
-        return array_map(static fn($o) => self::presentListItem($o), $orders);
+        return array_map(static fn($order) => self::presentListItem($order), $orders);
     }
 }

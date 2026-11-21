@@ -89,6 +89,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->get('orders/(:segment)', 'Admin\OrderAdminController::show/$1');
         $routes->patch('orders/(:segment)/status', 'Admin\OrderAdminController::updateStatus/$1');
         $routes->post('orders/(:segment)/lock', 'Admin\OrderAdminController::extendLock/$1');
+        $routes->post('orders/(:segment)/reset-orphan', 'Admin\OrderAdminController::resetOrphan/$1');
         $routes->post('orders/(:segment)/proofs/(:num)/review', 'Admin\PaymentAdminController::review/$1/$2');
 
         // Payment Accounts CRUD (Admin only)

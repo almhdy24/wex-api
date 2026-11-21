@@ -121,4 +121,18 @@ class OrderAdminController extends BaseApiController
 
         return $this->respondSuccess($presented, 'تم تمديد فترة حجز السعر بنجاح');
     }
+
+    /**
+     * POST /api/v1/admin/orders/{order_number}/reset-orphan
+     *
+     * Reset or expire an orphan order stuck in payment_review without proofs.
+     */
+    public function resetOrphan(string $orderNumber): ResponseInterface
+    {
+        $user = $this->currentUser();
+        $updated = $this->orderService->resetOrphanOrder($orderNumber, (int) $user->id);
+        $presented = AdminOrderPresenter::present($updated);
+
+        return $this->respondSuccess($presented, 'تمت معالجة الطلب وإعادته للحالة المناسبة بنجاح');
+    }
 }

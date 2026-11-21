@@ -113,14 +113,16 @@ class PaymentProofService
         }
 
         // Store image privately using ImageService
-        $relativePath = $this->imageService->savePaymentProof($uploadedFile);
-
+        $relativePath = null;
         $nowStr = gmdate('Y-m-d H:i:s');
         $isReplacement = ($order->status === Wex::ORDER_STATUS_PAYMENT_REVIEW);
         $db = Database::connect();
-        $db->transBegin();
 
         try {
+            $relativePath = $this->imageService->savePaymentProof($uploadedFile);
+
+            $db->transBegin();
+
             if ($isReplacement) {
                 // Mark previous pending proof(s) as replaced
                 $this->paymentProofs
@@ -141,6 +143,9 @@ class PaymentProofService
             ]);
 
             $proofId = $this->paymentProofs->insert($proof);
+            if (!$proofId) {
+                throw new \RuntimeException('فشل في حفظ سجل إشعار التحويل.');
+            }
 
             if (!$isReplacement) {
                 // Transition order status to payment_review
@@ -150,13 +155,15 @@ class PaymentProofService
                 ]);
             }
 
-            // Add timeline event
+            // Add structured timeline event
             if ($isReplacement) {
                 $fromStatus = Wex::ORDER_STATUS_PAYMENT_REVIEW;
-                $note = 'قام العميل بتحديث إشعار التحويل واستبدال الإشعار السابق للمراجعة';
+                $eventType  = 'payment_proof_replaced';
+                $note       = 'قام العميل بتحديث إشعار التحويل واستبدال الإشعار السابق للمراجعة';
             } else {
                 $fromStatus = Wex::ORDER_STATUS_PENDING_PAYMENT;
-                $note = 'قام العميل برفع إشعار التحويل البنكي للمراجعة';
+                $eventType  = 'payment_proof_uploaded';
+                $note       = 'قام العميل برفع إشعار التحويل البنكي للمراجعة';
             }
 
             if ($senderName) {
@@ -166,18 +173,39 @@ class PaymentProofService
                 $note .= " (رقم العملية: {$referenceNumber})";
             }
 
+            $eventMeta = [
+                'proof_id'         => (int) $proofId,
+                'sender_name'      => $senderName ? mb_substr(trim($senderName), 0, 150) : null,
+                'reference_number' => $referenceNumber ? mb_substr(trim($referenceNumber), 0, 100) : null,
+            ];
+
             $this->orderEvents->insert(new OrderEvent([
                 'order_id'      => $order->id,
                 'from_status'   => $fromStatus,
                 'to_status'     => Wex::ORDER_STATUS_PAYMENT_REVIEW,
                 'actor_user_id' => $userId,
+                'event_type'    => $eventType,
+                'meta'          => json_encode($eventMeta),
                 'note'          => $note,
                 'created_at'    => $nowStr,
             ]));
 
+            if ($db->transStatus() === false) {
+                $db->transRollback();
+                throw new \RuntimeException('فشل في إتمام عملية رفع إشعار التحويل.');
+            }
+
             $db->transCommit();
         } catch (\Throwable $e) {
-            $db->transRollback();
+            if (isset($db) && $db->transStatus() !== false) {
+                $db->transRollback();
+            }
+            if ($relativePath) {
+                $fileToDel = WRITEPATH . ltrim($relativePath, '/');
+                if (file_exists($fileToDel)) {
+                    @unlink($fileToDel);
+                }
+            }
             throw $e;
         }
 
@@ -196,12 +224,30 @@ class PaymentProofService
             log_message('warning', 'Failed to dispatch payment_proof_uploaded notification: {msg}', ['msg' => $e->getMessage()]);
         }
 
+        $createdProof = [
+            'id'               => (int) $proofId,
+            'order_id'         => (int) $order->id,
+            'status'           => Wex::PROOF_STATUS_PENDING,
+            'sender_name'      => $senderName ? mb_substr(trim($senderName), 0, 150) : null,
+            'reference_number' => $referenceNumber ? mb_substr(trim($referenceNumber), 0, 100) : null,
+            'review_note'      => null,
+            'image_url'        => "/api/v1/orders/{$order->order_number}/payment-proof/{$proofId}/image",
+            'created_at'       => gmdate('Y-m-d\TH:i:s\Z', strtotime($nowStr)),
+            'uploaded_at'      => gmdate('Y-m-d\TH:i:s\Z', strtotime($nowStr)),
+        ];
+
+        $allProofs = $this->paymentProofs->where('order_id', $order->id)->orderBy('id', 'DESC')->findAll();
+        $order->status = Wex::ORDER_STATUS_PAYMENT_REVIEW;
+        $paymentBlock = PaymentStateService::computePaymentBlock($order, $allProofs);
+
         return [
-            'proof_id'      => $proofId,
+            'proof'         => $createdProof,
+            'proof_id'      => (int) $proofId,
             'status'        => Wex::PROOF_STATUS_PENDING,
             'order_status'  => Wex::ORDER_STATUS_PAYMENT_REVIEW,
             'image_url'     => "/api/v1/orders/{$order->order_number}/payment-proof/{$proofId}/image",
             'uploaded_at'   => gmdate('Y-m-d\TH:i:s\Z', strtotime($nowStr)),
+            'payment'       => $paymentBlock,
         ];
     }
 
@@ -321,11 +367,18 @@ class PaymentProofService
                     $eventNote .= ' ملاحظة: ' . $reviewNote;
                 }
 
+                $eventMeta = [
+                    'proof_id'    => (int) $proof->id,
+                    'review_note' => $reviewNote,
+                ];
+
                 $this->orderEvents->insert(new OrderEvent([
                     'order_id'      => $order->id,
                     'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
                     'to_status'     => Wex::ORDER_STATUS_CONFIRMED,
                     'actor_user_id' => $reviewerUserId,
+                    'event_type'    => 'payment_approved',
+                    'meta'          => json_encode($eventMeta),
                     'note'          => $eventNote,
                     'created_at'    => $nowStr,
                 ]));
@@ -341,6 +394,10 @@ class PaymentProofService
                 // Check lock expiry
                 $nowTime = time();
                 $lockExpiresTime = strtotime($order->lock_expires_at);
+                $eventMeta = [
+                    'proof_id'    => (int) $proof->id,
+                    'review_note' => $reviewNote,
+                ];
 
                 if ($nowTime <= $lockExpiresTime) {
                     // Lock still valid: return to pending_payment for re-upload
@@ -359,6 +416,8 @@ class PaymentProofService
                         'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
                         'to_status'     => Wex::ORDER_STATUS_PENDING_PAYMENT,
                         'actor_user_id' => $reviewerUserId,
+                        'event_type'    => 'payment_rejected',
+                        'meta'          => json_encode($eventMeta),
                         'note'          => $eventNote,
                         'created_at'    => $nowStr,
                     ]));
@@ -388,6 +447,8 @@ class PaymentProofService
                         'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
                         'to_status'     => Wex::ORDER_STATUS_EXPIRED,
                         'actor_user_id' => $reviewerUserId,
+                        'event_type'    => 'payment_rejected',
+                        'meta'          => json_encode($eventMeta),
                         'note'          => $eventNote,
                         'created_at'    => $nowStr,
                     ]));

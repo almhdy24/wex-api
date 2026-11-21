@@ -3,12 +3,14 @@
 namespace App\Presenters;
 
 use App\Entities\Order;
+use App\Services\PaymentStateService;
 
 /**
  * CustomerOrderPresenter
  *
  * Strict whitelist for customer-visible order representations.
  * Never includes rate_sdg_snapshot, subtotal_aed, unit_price_aed, or line_total_aed.
+ * Includes unified payment block as single source of truth.
  */
 class CustomerOrderPresenter
 {
@@ -36,16 +38,24 @@ class CustomerOrderPresenter
 
         $timeline = array_map(static function ($event) {
             $eArr = is_array($event) ? $event : $event->toArray();
+            $meta = $eArr['meta'] ?? null;
+            if (is_string($meta)) {
+                $meta = json_decode($meta, true);
+            }
             return [
                 'id'          => (int) ($eArr['id'] ?? 0),
                 'from_status' => $eArr['from_status'] ?? null,
                 'to_status'   => (string) ($eArr['to_status'] ?? ''),
                 'status_text' => (string) ($eArr['status_text'] ?? ''),
+                'type'        => (string) ($eArr['type'] ?? $eArr['event_type'] ?? 'status_changed'),
+                'event_type'  => (string) ($eArr['event_type'] ?? $eArr['type'] ?? 'status_changed'),
+                'meta'        => $meta,
                 'note'        => (string) ($eArr['note'] ?? ''),
                 'created_at'  => $eArr['created_at'] ?? null,
             ];
         }, $arr['timeline'] ?? []);
 
+        $rawProofs = $arr['proofs'] ?? $arr['payment_proofs'] ?? [];
         $proofs = array_map(static function ($p) {
             $pArr = is_array($p) ? $p : $p->toArray();
             return [
@@ -56,9 +66,10 @@ class CustomerOrderPresenter
                 'review_note'      => $pArr['review_note'] ?? null,
                 'image_url'        => (string) ($pArr['image_url'] ?? ''),
                 'created_at'       => $pArr['created_at'] ?? null,
+                'uploaded_at'      => $pArr['uploaded_at'] ?? $pArr['created_at'] ?? null,
                 'reviewed_at'      => $pArr['reviewed_at'] ?? null,
             ];
-        }, $arr['payment_proofs'] ?? []);
+        }, $rawProofs);
 
         $bankDetails = isset($arr['bank_details']) && is_array($arr['bank_details']) ? [
             'bank_name'           => (string) ($arr['bank_details']['bank_name'] ?? ''),
@@ -68,6 +79,8 @@ class CustomerOrderPresenter
             'order_number'        => (string) ($arr['bank_details']['order_number'] ?? ($arr['order_number'] ?? '')),
         ] : null;
 
+        $paymentBlock = $arr['payment'] ?? PaymentStateService::computePaymentBlock($arr, $proofs);
+
         return [
             'order_number'                  => (string) ($arr['order_number'] ?? ''),
             'status'                        => (string) ($arr['status'] ?? ''),
@@ -76,6 +89,9 @@ class CustomerOrderPresenter
             'delivery_phone'                => $arr['delivery_phone'] ?? null,
             'delivery_address'              => $arr['delivery_address'] ?? null,
             'customer_note'                 => $arr['customer_note'] ?? null,
+            'payment'                       => $paymentBlock,
+            'proofs'                        => $proofs,
+            'payment_proofs'                => $proofs,
             'app_discount_percent_snapshot' => (int) ($arr['app_discount_percent_snapshot'] ?? 0),
             'subtotal_sdg'                  => (int) ($arr['subtotal_sdg'] ?? 0),
             'discount_sdg'                  => (int) ($arr['discount_sdg'] ?? 0),
@@ -94,7 +110,6 @@ class CustomerOrderPresenter
             'payment_general_notes'         => (string) ($arr['payment_general_notes'] ?? ''),
             'items'                         => $items,
             'timeline'                      => $timeline,
-            'payment_proofs'                => $proofs,
             'created_at'                    => $arr['created_at'] ?? null,
             'updated_at'                    => $arr['updated_at'] ?? null,
         ];
@@ -106,12 +121,15 @@ class CustomerOrderPresenter
     public static function presentListItem(array|Order $order): array
     {
         $arr = is_array($order) ? $order : $order->toArray();
+        $rawProofs = $arr['proofs'] ?? $arr['payment_proofs'] ?? [];
+        $paymentBlock = $arr['payment'] ?? PaymentStateService::computePaymentBlock($arr, $rawProofs);
 
         return [
             'order_number'      => (string) ($arr['order_number'] ?? ''),
             'status'            => (string) ($arr['status'] ?? ''),
             'status_label'      => (string) ($arr['status_label'] ?? ''),
             'delivery_type'     => (string) ($arr['delivery_type'] ?? ''),
+            'payment'           => $paymentBlock,
             'total_sdg'         => (int) ($arr['total_sdg'] ?? 0),
             'total_amount_sdg'  => (int) ($arr['total_sdg'] ?? 0),
             'lock_expires_at'   => $arr['lock_expires_at'] ?? null,
@@ -122,10 +140,10 @@ class CustomerOrderPresenter
     }
 
     /**
-     * Formats a collection of orders for customer list view.
+     * Formats a collection of customer orders.
      */
     public static function presentCollection(array $orders): array
     {
-        return array_map(static fn($o) => self::presentListItem($o), $orders);
+        return array_map(static fn($order) => self::presentListItem($order), $orders);
     }
 }
