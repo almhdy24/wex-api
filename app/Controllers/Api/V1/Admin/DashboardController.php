@@ -46,24 +46,35 @@ class DashboardController extends BaseApiController
      */
     public function index(): ResponseInterface
     {
-        // 1. Orders count by status
+        // 1. Orders count by status (excluding debug test orders)
         $statusCounts = [];
         foreach (Wex::ORDER_STATUSES as $status) {
-            $statusCounts[$status] = $this->orders->where('status', $status)->countAllResults();
+            $statusCounts[$status] = $this->orders
+                ->where('status', $status)
+                ->notLike('order_number', 'WEX-DBG-')
+                ->countAllResults();
         }
 
         // 2. Pending payment reviews requiring staff attention
-        $pendingReviewsCount = $this->proofs->where('status', Wex::PROOF_STATUS_PENDING)->countAllResults();
+        $pendingReviewsCount = $this->proofs
+            ->where('status', Wex::PROOF_STATUS_PENDING)
+            ->countAllResults();
 
-        // 3. Today's orders and revenue (UTC)
+        // 3. Today's orders and revenue (UTC) excluding cancelled, expired and debug orders
         $todayStart = gmdate('Y-m-d 00:00:00');
         $todayEnd   = gmdate('Y-m-d 23:59:59');
 
-        $todayOrdersQuery = $this->orders
-            ->where('created_at >=', $todayStart)
-            ->where('created_at <=', $todayEnd);
+        $inactiveStatuses = [
+            Wex::ORDER_STATUS_CANCELLED,
+            Wex::ORDER_STATUS_EXPIRED,
+        ];
 
-        $todayOrdersCount = $todayOrdersQuery->countAllResults(false);
+        $todayOrdersCount = $this->orders
+            ->where('created_at >=', $todayStart)
+            ->where('created_at <=', $todayEnd)
+            ->whereNotIn('status', $inactiveStatuses)
+            ->notLike('order_number', 'WEX-DBG-')
+            ->countAllResults();
 
         // Sum revenue of active / confirmed / completed orders today
         $revenueStatuses = [
@@ -78,6 +89,7 @@ class DashboardController extends BaseApiController
             ->where('created_at >=', $todayStart)
             ->where('created_at <=', $todayEnd)
             ->whereIn('status', $revenueStatuses)
+            ->notLike('order_number', 'WEX-DBG-')
             ->first();
 
         $todayRevenueSdg = $todayRevenueRow ? (int) ($todayRevenueRow->revenue ?? 0) : 0;

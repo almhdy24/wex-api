@@ -24,6 +24,11 @@
   - Claims PHPUnit Test: `tests/unit/ClaimsScanTest.php` reports 1 test, 1 assertion passed (PASS).
   - Test Suite: Full test suite passing with 100 tests and 4413 assertions (PASS).
 
+- [x] **Phase 4: P1 UI & Dashboard Active Orders Filtering (All GREEN)**
+  - Updated `DashboardController.php` to exclude `cancelled`, `expired`, and debug orders (`WEX-DBG-%`) from active today orders and status counts.
+  - Excluded debug orders (`WEX-DBG-%`) from status distribution metrics.
+  - Verified with full PHPUnit suite passing 100/100 tests.
+
 ## (a) Phase Checklist
 
 - [x] **Phase 0: Setup**
