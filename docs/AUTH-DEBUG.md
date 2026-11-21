@@ -34,3 +34,19 @@ Tests executed against CodeIgniter 4 backend (`http://127.0.0.1:8081/api/v1`) in
    - The backend `TokenService.php` had zero tolerance for reuse. A client sending an already-rotated token even 1 millisecond later caused instant nuclear revocation of the entire family.
 6. **No Expiry Sliding**:
    - Rotated tokens strictly inherited the original `expires_at`, capping the session at 30 days from initial login rather than 30 days from last use.
+
+---
+
+## 3. Post-Fix Verification Results (Phase 4)
+
+Re-verification executed against updated CodeIgniter 4 backend (`http://127.0.0.1:8081/api/v1`) after implementing token reuse grace window, sliding expiry, 401 normalization, and front-end single-flight locks.
+
+| Test Case | Command Pattern | HTTP Status | Verdict | Verification Details |
+|---|---|---|---|---|
+| **1. Email OTP Login & Cookie** | `curl -i -c test_jar.txt POST /auth/email/verify` | **200 OK** | **PASS** | Set-Cookie: `wex_refresh_token`, HttpOnly, Path=/, SameSite=Lax, Max-Age=2592000 (30 days). `refresh_token` omitted from JSON body by default. |
+| **2. Sliding Expiry Refresh** | `curl -i -b jar -c jar POST /auth/refresh` | **200 OK** | **PASS** | Set-Cookie re-emitted with full Max-Age=2592000 (30 days from now). Expiry timestamp shifted forward from `00:11:21` to `00:11:28`. |
+| **3. Parallel Refresh within Grace Period** | `curl -b jar ... & curl -b jar ... & wait` | **200 OK & 200 OK** | **PASS** | Both parallel requests succeed. Replayed token within 30-second grace window reissues a new active token without killing the family. |
+| **4. Database Pattern on Parallel Race** | `SELECT id, family_id, expires_at, revoked_at, revoke_reason FROM refresh_tokens` | **N/A** | **PASS** | Tokens #7 and #8 marked `revoked_at` with reason `'rotated'`. Active tokens #9 and #10 remain valid with `revoked_at: NULL`. |
+| **5. Missing Refresh Token Returns 401** | `curl -i -X POST /auth/refresh -d '{}'` | **401 Unauthorized** | **PASS** | Returns HTTP 401 with Arabic message `"انتهت صلاحية جلسة الدخول، يرجى تسجيل الدخول مجدداً"`. |
+| **6. Theft Detection Outside Grace Window** | Replay token after 35 seconds or with aged `revoked_at` | **401 Unauthorized** | **PASS** | Replaying a token older than `REFRESH_REUSE_GRACE_SECONDS` (30s) revokes all family tokens with `revoke_reason = 'reuse_detected'`. |
+

@@ -240,3 +240,43 @@ UPLOAD_MAX_MB = 5
 ```
 Uploads exceeding `UPLOAD_MAX_MB` or `post_max_size` trigger a standardized HTTP 413 error with the Arabic message:
 `"حجم الملف أكبر من المسموح، صغّر الصورة وحاول مرة أخرى"`.
+
+---
+
+## 9. Cookie Configuration & Same-Site Requirements (Customer Login Persistence)
+
+Mobile browsers (Android Chrome, iOS Safari) strictly block or restrict third-party cross-site cookies. For persistent 30-day customer sessions to function reliably on mobile devices:
+
+### 1. Same-Site Domain Architecture (Recommended)
+Host the storefront web application and the REST API under the same registrable domain (eTLD+1), or proxy `/api` on the same origin:
+- Web Storefront: `https://wextechnology.sd` (or `https://wex.example.com`)
+- API Server: `https://api.wextechnology.sd` (or reverse-proxied at `https://wextechnology.sd/api`)
+
+Under this architecture, cookies are treated as first-party same-site cookies:
+```ini
+COOKIE_SAMESITE = Lax
+COOKIE_SECURE = true
+```
+
+### 2. Cross-Site Deployment (If APIs reside on separate domain)
+If the web storefront and API are on different domains (e.g., `https://wex-storefront.pages.dev` and `https://api-render.com`):
+```ini
+COOKIE_SAMESITE = None
+COOKIE_SECURE = true
+```
+> [!WARNING]
+> `SameSite=None` requires HTTPS and `COOKIE_SECURE=true`. Modern mobile browsers will silently drop `SameSite=None` cookies on HTTP or when third-party cookie restrictions are active.
+
+### 3. Session Lifetime & Concurrency Keys (`.env`)
+```ini
+# Sliding refresh token TTL (default 30 days)
+JWT_REFRESH_TTL_DAYS = 30
+
+# Absolute lifetime ceiling for a token family (default 180 days)
+JWT_REFRESH_MAX_LIFETIME_DAYS = 180
+
+# Replay grace window for rotated tokens (default 30 seconds)
+# Prevents session termination when concurrent tabs or mobile network retries present the old token
+REFRESH_REUSE_GRACE_SECONDS = 30
+```
+

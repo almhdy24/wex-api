@@ -119,9 +119,12 @@ Authorization: Bearer <access_token>
 
 #### Refresh Access Token
 - **`POST /api/v1/auth/refresh`**
-  - **Body:** `{"refresh_token": "<token_string>"}`
-  - **Description:** Exchanges a valid refresh token for a new access token and rotated refresh token.
-  - **Response 200:** Returns new tokens pair.
+  - **Credentials:** HttpOnly `wex_refresh_token` cookie automatically transmitted by browser, or optional body `{"refresh_token": "<token_string>"}`.
+  - **Headers (Optional):** `X-Client: native` (requests returning `refresh_token` in JSON body).
+  - **Body (Optional):** `{"return_refresh_token": true}`
+  - **Description:** Exchanges a valid refresh token for a new access token (15m) and rotated refresh token with 30-day sliding expiry (capped at 180 days from family creation). Replays within `REFRESH_REUSE_GRACE_SECONDS` (30s) are safely reissued to tolerate concurrent tab bootstrapping without session termination.
+  - **Response 200:** Returns fresh `access_token`, `expires_in: 900`, `refresh_expires_in: 2592000`, user profile, and re-emits rotated persistent `wex_refresh_token` cookie.
+  - **Response 401:** Returned if refresh token is missing, expired, or revoked.
 
 #### Logout (Current Session)
 - **`POST /api/v1/auth/logout`**

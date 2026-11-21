@@ -67,3 +67,13 @@ This document tracks all design and technical decisions made for the **wex-api**
   - `prices_updated_at` setting provides timestamp of the latest price/rate change without revealing the rate itself.
   - Admin users and staff retain full visibility and editing capabilities for AED prices, conversion rates, rate audit history, and AED subtotals.
 
+### 13. Refresh Token Grace Window & Sliding Session Persistence
+- **Decision:**
+  - Token rotation implements a 30-second reuse grace window (`REFRESH_REUSE_GRACE_SECONDS`). If a recently rotated token is presented again within 30 seconds (due to React StrictMode double effects, multi-tab restoration, or network retries), the backend reissues a fresh valid pair in the same family rather than revoking the family.
+  - Expiry is sliding: each successful refresh pushes `expires_at` 30 days into the future from the current time, re-setting the persistent HttpOnly cookie.
+  - To prevent indefinite sessions, an absolute ceiling of 180 days (`JWT_REFRESH_MAX_LIFETIME_DAYS`) from `family_created_at` is strictly enforced.
+- **Security Trade-off (VITE_AUTH_STORAGE_FALLBACK):**
+  - Web clients default to HttpOnly same-site cookies (`wex_refresh_token`), protecting against client-side script token theft (XSS).
+  - For constrained web environments or webview browsers where third-party cookies are blocked, clients can opt in to localStorage fallback via `VITE_AUTH_STORAGE_FALLBACK=true`. In this mode, `return_refresh_token=true` is requested, trading XSS immunity for cookie-blocking resilience.
+
+
