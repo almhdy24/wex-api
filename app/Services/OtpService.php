@@ -46,7 +46,8 @@ class OtpService
             ->orderBy('id', 'DESC')
             ->first();
 
-        if ($latest && (strtotime($latest->created_at) + $this->cooldownSeconds) > $now) {
+        $isLocalDev = (ENVIRONMENT === 'testing' || (ENVIRONMENT === 'development' && ($ip === '127.0.0.1' || $ip === '::1' || $ip === 'localhost' || $ip === null)));
+        if (!$isLocalDev && $latest && (strtotime($latest->created_at) + $this->cooldownSeconds) > $now) {
             $waitSeconds = ($this->cooldownSeconds - ($now - strtotime($latest->created_at)));
             throw new TooManyRequestsException($waitSeconds, lang('Api.otp_cooldown'));
         }

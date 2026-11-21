@@ -718,6 +718,32 @@ class OrderService
 
         $orders = $builder->orderBy('id', 'DESC')->findAll($perPage, $offset);
 
+        $userIds = array_filter(array_unique(array_map(static fn($o) => (int) $o->user_id, $orders)));
+        $usersById = [];
+        if (!empty($userIds)) {
+            $userRows = $this->users->whereIn('id', $userIds)->findAll();
+            foreach ($userRows as $u) {
+                $usersById[$u->id] = $u;
+            }
+        }
+
+        $orderIds = array_map(static fn($o) => (int) $o->id, $orders);
+        $proofsByOrderId = [];
+        if (!empty($orderIds)) {
+            $proofRows = $this->paymentProofs->whereIn('order_id', $orderIds)->orderBy('id', 'DESC')->findAll();
+            foreach ($proofRows as $p) {
+                $proofsByOrderId[$p->order_id][] = [
+                    'id'               => (int) $p->id,
+                    'status'           => (string) $p->status,
+                    'sender_name'      => $p->sender_name,
+                    'reference_number' => $p->reference_number,
+                    'review_note'      => $p->review_note,
+                    'created_at'       => $p->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->created_at)) : null,
+                    'reviewed_at'      => $p->reviewed_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p->reviewed_at)) : null,
+                ];
+            }
+        }
+
         $items = [];
         foreach ($orders as $order) {
             $this->refreshExpiry($order);
@@ -727,9 +753,26 @@ class OrderService
                 ? max(0, $expiresAt - time())
                 : 0;
 
+            $userObj = $usersById[$order->user_id] ?? null;
+            $customerName = $userObj?->name ?: ($order->delivery_name ?: 'عميل');
+            $customerPhone = $userObj?->phone ?: ($order->delivery_phone ?: '');
+
+            $orderProofs = $proofsByOrderId[$order->id] ?? [];
+            foreach ($orderProofs as &$pr) {
+                $pr['image_url'] = "/api/v1/orders/{$order->order_number}/payment-proof/{$pr['id']}/image";
+            }
+            unset($pr);
+
             $items[] = [
+                'id'                => (int) $order->id,
                 'order_number'      => $order->order_number,
                 'user_id'           => (int) $order->user_id,
+                'customer_name'     => $customerName,
+                'customer_phone'    => $customerPhone,
+                'amount'            => (int) $order->total_sdg,
+                'expected_amount'   => (int) $order->total_sdg,
+                'payment_proofs'    => $orderProofs,
+                'proofs'            => $orderProofs,
                 'status'            => $order->status,
                 'status_label'      => OrderStateMachine::getStatusLabel($order->status),
                 'delivery_type'     => $order->delivery_type,
@@ -737,6 +780,7 @@ class OrderService
                 'rate_sdg_snapshot' => (int) $order->rate_sdg_snapshot,
                 'subtotal_aed'      => (int) $order->subtotal_aed,
                 'total_sdg'         => (int) $order->total_sdg,
+                'total_amount_sdg'  => (int) $order->total_sdg,
                 'lock_expires_at'   => gmdate('Y-m-d\TH:i:s\Z', $expiresAt),
                 'seconds_remaining' => $secondsRemaining,
                 'created_at'        => $order->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($order->created_at)) : null,

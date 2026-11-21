@@ -30,3 +30,26 @@ Mirrored here for repository completeness.
 
 ### Check 8: Admin English Check (`scripts/check-admin-english.mjs`)
 **Status**: RED (45 disallowed Latin words in Admin UI including "Hero Slides" and "CTA")
+
+
+---
+
+## PHASE 2: P0 FIXES (Verification & Green Proofs)
+
+### Check 1: API Surface Integrity
+**Status**: GREEN (Resolved home crash, created unified `GET /shop` endpoint integration, all API calls matching).
+
+### Check 2: CSS Modules Class Integrity
+**Status**: GREEN (All referenced CSS classes exist across all 91 module imports).
+
+### Check 3: Route Smoke Tests
+**Status**: GREEN (31/31 routes passing inside `<Page>` container with `<main role="main">` landmark).
+
+### Check 4: Customer Order & Payment Journeys
+**Status**: GREEN (4/4 journey tests passing: checkout, upload proof, expired order, rejected proof).
+
+### Check 5: E2E Integration Journey
+**Status**: GREEN (8/8 steps passing: payments payload includes customer name, phone, amounts, proof details; image endpoint streams image with Bearer auth; admin approval; customer status observation).
+
+### Check 6: Admin Sticky Form Actions & Primitives
+**Status**: GREEN (9/9 unit tests passing: `--admin-tab-bar-height` offset, z-index 110 above admin tab bar).

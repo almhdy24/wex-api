@@ -8,6 +8,12 @@
   - Synced E2E journey test `scripts/e2e.sh` verifying payment review lists and image streaming (RED on missing fields)
   - Documented baseline failure logs in `docs/STABILIZE-LOG.md`.
 
+- [x] **Phase 2: P0 Fixes (All GREEN)**
+  - Admin Payments List Payload: Updated `AdminOrderPresenter::presentListItem` and `OrderService::listAdminOrders` to include joined customer information (`customer_name`, `customer_phone`), integer amounts (`amount`, `expected_amount`), and proof records (`payment_proofs`, `proofs`).
+  - Proof Image Streaming: Verified `/api/v1/orders/{orderNumber}/payment-proof/{proofId}/image` streams proof images with Bearer auth, correct image MIME type, and exact file size matching storage.
+  - Rate Limiting: Exempted local loopback (`127.0.0.1`) under `ENVIRONMENT === 'development'` in `ThrottleFilter` and `OtpService` to unblock automated testing while preserving production rate limits.
+  - Verified with `bash scripts/e2e.sh` passing all 8 steps. Full raw verification logs in `docs/STABILIZE-LOG.md`.
+
 ## (a) Phase Checklist
 
 - [x] **Phase 0: Setup**

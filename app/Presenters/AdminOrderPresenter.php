@@ -112,8 +112,15 @@ class AdminOrderPresenter
         $arr = is_array($order) ? $order : $order->toArray();
 
         return [
+            'id'                => isset($arr['id']) ? (int) $arr['id'] : null,
             'order_number'      => (string) ($arr['order_number'] ?? ''),
             'user_id'           => isset($arr['user_id']) ? (int) $arr['user_id'] : null,
+            'customer_name'     => (string) ($arr['customer_name'] ?? $arr['user']['name'] ?? $arr['delivery_name'] ?? 'عميل'),
+            'customer_phone'    => (string) ($arr['customer_phone'] ?? $arr['user']['phone'] ?? $arr['delivery_phone'] ?? ''),
+            'amount'            => (int) ($arr['amount'] ?? $arr['total_sdg'] ?? 0),
+            'expected_amount'   => (int) ($arr['expected_amount'] ?? $arr['total_sdg'] ?? 0),
+            'payment_proofs'    => $arr['payment_proofs'] ?? $arr['proofs'] ?? [],
+            'proofs'            => $arr['payment_proofs'] ?? $arr['proofs'] ?? [],
             'status'            => (string) ($arr['status'] ?? ''),
             'status_label'      => (string) ($arr['status_label'] ?? ''),
             'delivery_type'     => (string) ($arr['delivery_type'] ?? ''),

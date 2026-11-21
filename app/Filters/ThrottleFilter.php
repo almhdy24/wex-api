@@ -18,8 +18,9 @@ class ThrottleFilter implements FilterInterface
 {
     public function before(RequestInterface $request, $arguments = null)
     {
-        // Don't throttle in testing environment
-        if (ENVIRONMENT === 'testing') {
+        // Don't throttle in testing environment or local development on loopback
+        $ip = $request->getIPAddress();
+        if (ENVIRONMENT === 'testing' || (ENVIRONMENT === 'development' && ($ip === '127.0.0.1' || $ip === '::1' || $ip === 'localhost'))) {
             return null;
         }
 
