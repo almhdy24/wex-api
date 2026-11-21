@@ -52,11 +52,11 @@ class SettingsController extends BaseApiController
             'prices_updated_at'       => $pricesUpdatedAt,
             'delivery_notes'          => $map['delivery_notes'] ?? ($map['extra_delivery_note'] ?? 'التوصيل متاح داخل ولاية الخرطوم والولايات المحددة.'),
             'extra_delivery_note'     => $map['extra_delivery_note'] ?? ($map['delivery_notes'] ?? null),
-            'policy_inspection_title' => $map['policy_inspection_title'] ?? 'معاينة الأجهزة',
-            'policy_inspection'       => $map['policy_inspection'] ?? ($map['inspection_note'] ?? 'أجهزة مستوردة؛ يعاين العميل الجهاز بنفسه عند الاستلام في المتجر.'),
+            'policy_inspection_title' => $map['policy_inspection_title'] ?? 'استلام الأجهزة',
+            'policy_inspection'       => $map['policy_inspection'] ?? ($map['inspection_note'] ?? 'أجهزة مستوردة؛ يتأكد المشتري من مطابقة الجهاز ومواصفاته الفنية عند الاستلام.'),
             'inspection_note'         => $map['inspection_note'] ?? ($map['policy_inspection'] ?? null),
             'policy_pickup'           => $map['policy_pickup'] ?? 'يمكنك استلام الجهاز من مقرنا في مول الواحة، الشهداء، أم درمان.',
-            'policy_return'           => $map['policy_return'] ?? ($map['returns_note'] ?? 'نظراً لطبيعة الأجهزة المستوردة، يتم الاستلام بعد المعاينة المباشرة.'),
+            'policy_return'           => $map['policy_return'] ?? ($map['returns_note'] ?? 'نظراً لطبيعة الأجهزة المستوردة، يتم الاستلام والتأكد من الجهاز عند الاستلام.'),
             'returns_note'            => $map['returns_note'] ?? ($map['policy_return'] ?? null),
         ];
 

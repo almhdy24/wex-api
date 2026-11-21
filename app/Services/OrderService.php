@@ -603,9 +603,9 @@ class OrderService
 
         // Public bank details for payment (backward compatibility)
         $bankDetails = [
-            'bank_name'           => $firstAccount ? $firstAccount->bank_name : $this->settingService->get('bank_name', 'بنك الخرطوم (تطبيق بنكك)'),
-            'bank_account_name'   => $firstAccount ? $firstAccount->account_name : $this->settingService->get('bank_account_name', 'Wex Technology - ويكس تكنولوجي'),
-            'bank_account_number' => $firstAccount ? $firstAccount->account_number : $this->settingService->get('bank_account_number', '2849102'),
+            'bank_name'           => $firstAccount ? $firstAccount->bank_name : $this->settingService->get('bank_name', ''),
+            'bank_account_name'   => $firstAccount ? $firstAccount->account_name : $this->settingService->get('bank_account_name', ''),
+            'bank_account_number' => $firstAccount ? $firstAccount->account_number : $this->settingService->get('bank_account_number', ''),
             'amount_sdg'          => (int) $order->total_sdg,
             'order_number'        => $order->order_number,
         ];
@@ -754,7 +754,7 @@ class OrderService
                 : 0;
 
             $userObj = $usersById[$order->user_id] ?? null;
-            $customerName = $userObj?->name ?: ($order->delivery_name ?: 'عميل');
+            $customerName = $userObj?->name ?: ($order->delivery_name ?: ($userObj?->phone ?: ($order->delivery_phone ?: '')));
             $customerPhone = $userObj?->phone ?: ($order->delivery_phone ?: '');
 
             $orderProofs = $proofsByOrderId[$order->id] ?? [];

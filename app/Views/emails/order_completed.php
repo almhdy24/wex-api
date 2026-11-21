@@ -14,7 +14,7 @@
     </tr>
     <tr>
         <td class="label">إجمالي القيمة:</td>
-        <td class="value"><?= number_format($total_sdg) ?> جنيه سوداني</td>
+        <td class="value"><?= number_format($total_sdg) ?> ج.س</td>
     </tr>
 </table>
 <?= $this->endSection() ?>

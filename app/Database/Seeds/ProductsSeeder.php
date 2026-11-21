@@ -152,8 +152,8 @@ class ProductsSeeder extends Seeder
                 'is_active'         => 1,
                 'is_featured'       => 0,
                 'warranty_text'     => null,
-                'short_description' => 'معالج الجيل العاشر مع هارد سريع',
-                'description'       => 'أداء سريع وإقلاع فوري للنظام والبرامج مع شاشة واضحة الألوان.',
+                'short_description' => 'معالج الجيل العاشر مع وحدة تخزين SSD',
+                'description'       => 'وحدة تخزين SSD وإقلاع سلس للنظام والبرامج مع شاشة واضحة الألوان.',
                 'specs'             => json_encode([
                     'cpu'     => 'Intel Core i5-10210U',
                     'ram'     => '8 GB',
@@ -197,7 +197,7 @@ class ProductsSeeder extends Seeder
                 'is_featured'       => 0,
                 'warranty_text'     => null,
                 'short_description' => 'كرت شاشة منفصل للألعاب والتصميم',
-                'description'       => 'تبريد مزدوج وشاشة سريعة 144 هيرتز مناسبة للألعاب والمونتاج والهندسة.',
+                'description'       => 'تبريد مزدوج وشاشة بتردد 144 هيرتز مناسبة للألعاب والمونتاج والهندسة.',
                 'specs'             => json_encode([
                     'cpu'     => 'AMD Ryzen 5-3550H',
                     'ram'     => '8 GB',
@@ -296,8 +296,8 @@ class ProductsSeeder extends Seeder
                 'is_active'         => 1,
                 'is_featured'       => 0,
                 'warranty_text'     => null,
-                'short_description' => 'ترقية سرعة الإقلاع والبرامج',
-                'description'       => 'هارد سريع لتحسين أداء اللابتوبات القديمة والجديدة بمعدل قراءة عالي.',
+                'short_description' => 'ترقية أداء الإقلاع والبرامج',
+                'description'       => 'وحدة تخزين SSD لتحسين أداء اللابتوبات بمعدل قراءة ثابت.',
                 'specs'             => json_encode([
                     'capacity'  => '256 GB',
                     'interface' => 'SATA III 2.5 inch',
@@ -315,7 +315,7 @@ class ProductsSeeder extends Seeder
                 'is_active'         => 1,
                 'is_featured'       => 0,
                 'warranty_text'     => null,
-                'short_description' => 'رام لتسريع الجهاز وتعدد المهام',
+                'short_description' => 'رام لتحسين استجابة الجهاز وتعدد المهام',
                 'description'       => 'شريحة رام أصلية لرفع كفاءة اللابتوب وسلاسة فتح البرامج المتزامنة.',
                 'specs'             => json_encode([
                     'capacity' => '8 GB',

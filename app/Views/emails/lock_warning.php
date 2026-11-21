@@ -14,11 +14,11 @@
     </tr>
     <tr>
         <td class="label">المبلغ المطلوب:</td>
-        <td class="value" style="color: #0B3FBF; font-weight: bold;"><?= number_format($total_sdg) ?> جنيه سوداني</td>
+        <td class="value" style="color: #0B3FBF; font-weight: bold;"><?= number_format($total_sdg) ?> ج.س</td>
     </tr>
     <tr>
         <td class="label">رقم حساب بنكك:</td>
-        <td class="value" style="font-size: 16px;"><?= esc($bank_account_number ?? '2849102') ?></td>
+        <td class="value" style="font-size: 16px;"><?= esc($bank_account_number ?? '') ?></td>
     </tr>
 </table>
 <?= $this->endSection() ?>

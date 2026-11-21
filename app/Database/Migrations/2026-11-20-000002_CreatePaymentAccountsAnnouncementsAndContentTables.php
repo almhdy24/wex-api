@@ -59,27 +59,29 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
         $this->forge->addKey('id', true);
         $this->forge->createTable('payment_accounts', true);
 
-        // Migrate existing bank details from settings into payment_accounts row 1
+        // Migrate existing bank details from settings into payment_accounts row 1 if present
         $now = gmdate('Y-m-d H:i:s');
         $bankNameSetting = $this->db->table('settings')->where('key', 'bank_name')->get()->getRow();
         $accountNameSetting = $this->db->table('settings')->where('key', 'bank_account_name')->get()->getRow();
         $accountNumSetting = $this->db->table('settings')->where('key', 'bank_account_number')->get()->getRow();
 
-        $bankName = $bankNameSetting ? trim($bankNameSetting->value) : 'بنك الخرطوم (تطبيق بنكك)';
-        $accountName = $accountNameSetting ? trim($accountNameSetting->value) : 'Wex Technology - ويكس تكنولوجي';
-        $accountNumber = $accountNumSetting ? trim($accountNumSetting->value) : '2849102';
+        $bankName = $bankNameSetting ? trim($bankNameSetting->value) : '';
+        $accountName = $accountNameSetting ? trim($accountNameSetting->value) : '';
+        $accountNumber = $accountNumSetting ? trim($accountNumSetting->value) : '';
 
-        $this->db->table('payment_accounts')->insert([
-            'bank_name'      => $bankName ?: 'بنك الخرطوم (تطبيق بنكك)',
-            'account_name'   => $accountName ?: 'Wex Technology - ويكس تكنولوجي',
-            'account_number' => $accountNumber ?: '2849102',
-            'branch'         => 'الفرع الرئيسي - أم درمان',
-            'notes'          => 'يرجى كتابة رقم الطلب في خانة الملاحظات عند التحويل عبر تطبيق بنكك.',
-            'is_active'      => 1,
-            'sort_order'     => 1,
-            'created_at'     => $now,
-            'updated_at'     => $now,
-        ]);
+        if (!empty($bankName) && !empty($accountNumber)) {
+            $this->db->table('payment_accounts')->insert([
+                'bank_name'      => $bankName,
+                'account_name'   => $accountName,
+                'account_number' => $accountNumber,
+                'branch'         => 'الفرع الرئيسي - أم درمان',
+                'notes'          => 'يرجى كتابة رقم الطلب في خانة الملاحظات عند التحويل عبر تطبيق بنكك.',
+                'is_active'      => 1,
+                'sort_order'     => 1,
+                'created_at'     => $now,
+                'updated_at'     => $now,
+            ]);
+        }
 
         // General payment instructions setting
         $hasNotes = $this->db->table('settings')->where('key', 'payment_general_notes')->countAllResults();
@@ -227,8 +229,8 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
         // Seed 3 default slides
         $defaultSlides = [
             [
-                'title'        => 'أجهزة لابتوب مختارة بعناية لأعمالك ودراستك',
-                'subtitle'     => 'أجهزة مستوردة مختارة بعناية مع إمكانية المعاينة المباشرة في فرعنا بأم درمان',
+                'title'        => 'أجهزة لابتوب لأعمالك ودراستك',
+                'subtitle'     => 'أجهزة مستوردة متوفرة في فرعنا بأم درمان',
                 'image'        => '/assets/hero/hero-1.webp',
                 'button_label' => 'استعرض الأجهزة',
                 'link'         => '/catalog',
@@ -238,8 +240,8 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
                 'updated_at'   => $now,
             ],
             [
-                'title'        => 'تثبيت السعر والدفع عبر بنكك مباشرة',
-                'subtitle'     => 'نضمن لك استقرار السعر من لحظة الطلب وحتى إتمام التحويل البنكي',
+                'title'        => 'تثبيت السعر والدفع عبر بنكك',
+                'subtitle'     => 'استقرار السعر من لحظة الطلب وحتى إتمام التحويل البنكي خلال المهلة المحددة',
                 'image'        => '/assets/hero/hero-2.webp',
                 'button_label' => 'كيفية الطلب',
                 'link'         => '/#how-to-order',
@@ -382,7 +384,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
         $defaultFaqs = [
             [
                 'question'   => 'كيف يعمل نظام تثبيت السعر في ويكس تكنولوجي؟',
-                'answer'     => 'عند تقديم الطلب، يتم حجز الجهاز وتثبيت سعره بالجنيه السوداني لمدة 4 ساعات، مما يحميك من أي تقلبات في سعر الصرف أثناء إتمام التحويل عبر تطبيق بنكك.',
+                'answer'     => 'عند تقديم الطلب، يتم حجز الجهاز وتثبيت سعره بـ ج.س لمدة 4 ساعات، مما يحميك من أي تقلبات في سعر الصرف أثناء إتمام التحويل عبر تطبيق بنكك.',
                 'sort_order' => 1,
                 'is_active'  => 1,
                 'created_at' => $now,
@@ -472,8 +474,8 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
             ],
             [
                 'slug'       => 'returns',
-                'title'      => 'سياسة المعاينة والاستلام',
-                'body'       => "نحرص على الشفافية:\n\n1. الأجهزة المعروضة مستوردة.\n2. يُتاح للعميل معاينة الجهاز في المتجر (الشاشة، المنافذ، البطارية، لوحة المفاتيح) عند الاستلام.\n3. نظراً لطبيعة الأجهزة المستوردة، يتم الاستلام بعد المعاينة المباشرة في مقرنا.\n\n(ملاحظة للإدارة: هذه مسودة أولية يُراجعها صاحب المحل).",
+                'title'      => 'سياسة الاستلام والتسليم',
+                'body'       => "نحرص على الشفافية:\n\n1. الأجهزة المعروضة مستوردة.\n2. يتأكد المشتري من مطابقة الجهاز ومواصفاته الفنية عند الاستلام.\n3. يتم استلام الطلبات من مقرنا أو عبر مندوب التوصيل.\n\n(ملاحظة للإدارة: هذه مسودة أولية يُراجعها صاحب المحل).",
                 'is_active'  => 1,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -481,7 +483,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
             [
                 'slug'       => 'about',
                 'title'      => 'عن ويكس تكنولوجي',
-                'body'       => "ويكس تكنولوجي - متجر لأجهزة اللابتوب ومستلزمات الحواسيب في أم درمان والسودان.\n\nنقدم أجهزة لابتوب مختارة لتناسب احتياجات المهندسين والطلاب ورواد الأعمال، مع وضوح في الأسعار بالجنيه السوداني ونظام تثبيت السعر.\n\nمقرنا: مول الواحة، الشهداء، أم درمان.",
+                'body'       => "ويكس تكنولوجي - متجر لأجهزة اللابتوب ومستلزمات الحواسيب في أم درمان والسودان.\n\nنقدم أجهزة لابتوب لتناسب احتياجات المهندسين والطلاب ورواد الأعمال، مع وضوح في الأسعار بـ ج.س ونظام تثبيت السعر.\n\nمقرنا: مول الواحة، الشهداء، أم درمان.",
                 'is_active'  => 1,
                 'created_at' => $now,
                 'updated_at' => $now,

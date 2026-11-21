@@ -14,6 +14,16 @@
   - Rate Limiting: Exempted local loopback (`127.0.0.1`) under `ENVIRONMENT === 'development'` in `ThrottleFilter` and `OtpService` to unblock automated testing while preserving production rate limits.
   - Verified with `bash scripts/e2e.sh` passing all 8 steps. Full raw verification logs in `docs/STABILIZE-LOG.md`.
 
+- [x] **Phase 3: Data and Content Cleanup (All GREEN)**
+  - Dev & Debug Data Cleanup Script: Created `scripts/cleanup-dev-data.sh` with production environment check (refuses when `CI_ENVIRONMENT=production`), deleting `WEX-DBG-%` orders, proofs, test files, and test users.
+  - Purged Placeholder Bank Data: Removed placeholder account `2849102` from `SettingsSeeder.php`, `OrderService.php`, `2026-11-20-000002_CreatePaymentAccountsAnnouncementsAndContentTables.php`, and email templates (`lock_warning.php`, `order_created.php`).
+  - DevSeeder: Created `app/Database/Seeds/DevSeeder.php` refusing to execute in production environment.
+  - Claims Removal: Cleaned marketing claims and placeholders across `ProductsSeeder.php`, `hero_slides`, `pages`, and `faq_items`.
+  - Content Sanitization in Services & Controllers: Updated `SettingService.php` and `SettingsController.php` inspection and returns policies to factual text.
+  - Database Audit: `scripts/audit-db.sh` reports 0 violating rows (PASS).
+  - Claims PHPUnit Test: `tests/unit/ClaimsScanTest.php` reports 1 test, 1 assertion passed (PASS).
+  - Test Suite: Full test suite passing with 100 tests and 4413 assertions (PASS).
+
 ## (a) Phase Checklist
 
 - [x] **Phase 0: Setup**

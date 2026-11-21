@@ -22,9 +22,6 @@ class SettingsSeeder extends Seeder
             ['key' => 'shop_phone',              'value' => '+249 9XX XXX XXX'],
             ['key' => 'shop_whatsapp',           'value' => '249912345678'],
             ['key' => 'working_hours',           'value' => 'من 10 صباحاً إلى 10 مساءً، عدا الجمعة'],
-            ['key' => 'bank_name',               'value' => 'بنك الخرطوم (تطبيق بنكك) - تجريبي'],
-            ['key' => 'bank_account_name',       'value' => 'Wex Technology - ويكس تكنولوجي (حساب تجريبي)'],
-            ['key' => 'bank_account_number',     'value' => '2849102'],
         ];
 
         foreach ($settings as $setting) {
