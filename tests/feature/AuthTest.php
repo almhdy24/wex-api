@@ -136,7 +136,12 @@ final class AuthTest extends CIUnitTestCase
         $this->assertNotEmpty($newRefreshToken);
         $this->assertNotSame($initialRefreshToken, $newRefreshToken);
 
-        // 2. Replay initial refresh token (THEFT DETECTION) -> fails with 401
+        // 2. Replay initial refresh token outside grace window (THEFT DETECTION)
+        $tokenModel = new \App\Models\RefreshTokenModel();
+        $tokenModel->where('token_hash', hash('sha256', $initialRefreshToken))
+            ->set(['revoked_at' => gmdate('Y-m-d H:i:s', time() - 60)])
+            ->update();
+
         $theftResult = $this->withBody(json_encode(['refresh_token' => $initialRefreshToken]))
             ->post('api/v1/auth/refresh');
 
@@ -209,7 +214,7 @@ final class AuthTest extends CIUnitTestCase
         $this->assertSame('customer', $authData['user']['role']);
     }
 
-    public function testRefreshTokenViaCookiePreservesAbsoluteExpiration(): void
+    public function testRefreshTokenViaCookieProvidesSlidingExpiry(): void
     {
         $userModel = new UserModel();
         $user = $userModel->where('role', Wex::ROLE_ADMIN)->first();
@@ -221,10 +226,10 @@ final class AuthTest extends CIUnitTestCase
         $tokenModel = new \App\Models\RefreshTokenModel();
         $initialRecord = $tokenModel->where('token_hash', $initialHash)->first();
         $this->assertNotNull($initialRecord);
-        $originalExpiresAt = $initialRecord->expires_at;
 
-        // Call refresh using Cookie header and no JSON body
+        // Call refresh using Cookie header and return_refresh_token=true
         $result = $this->withHeaders(['Cookie' => 'wex_refresh_token=' . $initialRefreshToken])
+            ->withBody(json_encode(['return_refresh_token' => true]))
             ->post('api/v1/auth/refresh');
 
         $result->assertStatus(200);
@@ -241,9 +246,9 @@ final class AuthTest extends CIUnitTestCase
         $newRecord = $tokenModel->where('token_hash', $newHash)->first();
         $this->assertNotNull($newRecord);
 
-        // Crucial requirement: rotated token MUST inherit original expires_at (no extension)
-        $this->assertSame((string) $originalExpiresAt, (string) $newRecord->expires_at);
-        $this->assertSame((int) $initialRecord->family_id, (int) $newRecord->family_id);
+        // Sliding expiry: rotated token expires_at moves forward ~30 days from now
+        $this->assertGreaterThanOrEqual(time() + (29 * 86400), strtotime($newRecord->expires_at));
+        $this->assertSame((string) $initialRecord->family_id, (string) $newRecord->family_id);
     }
 
     public function testLogoutViaCookieClearsCookieAndRevokesSession(): void

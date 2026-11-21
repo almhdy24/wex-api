@@ -6,7 +6,7 @@ use CodeIgniter\Entity\Entity;
 
 class RefreshToken extends Entity
 {
-    protected $dates = ['expires_at', 'revoked_at', 'created_at'];
+    protected $dates = ['expires_at', 'revoked_at', 'created_at', 'family_created_at'];
 
     protected $casts = [
         'id'             => 'integer',

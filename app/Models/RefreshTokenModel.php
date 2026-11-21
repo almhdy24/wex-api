@@ -22,6 +22,8 @@ class RefreshTokenModel extends Model
         'revoked_at',
         'replaced_by_id',
         'created_at',
+        'revoke_reason',
+        'family_created_at',
     ];
 
     protected $useTimestamps = false;

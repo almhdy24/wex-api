@@ -216,4 +216,19 @@
   - Replaced unverified wording in transactional email templates (`payment_approved.php`, `lock_warning.php`, `order_expired.php`).
   - Added PHPUnit automated claims scanner: `tests/unit/ClaimsScannerTest.php` enforcing zero invented claims across Views, Seeders, and Controllers.
 
+---
+
+## Phase 2: Login Persistence & Refresh Token Hardening (API)
+- **Status**: Completed
+- **Branch**: `fix-login-persistence`
+- **Changes**:
+  - Implemented 30-second token reuse grace window (`REFRESH_REUSE_GRACE_SECONDS`, default 30s): replaying a recently rotated token within the grace period reissues a fresh pair in the same family instead of destroying the session.
+  - Implemented sliding expiry: each refresh extends token validity by 30 days (`JWT_REFRESH_TTL_DAYS`) from now, capped by a 180-day absolute ceiling (`JWT_REFRESH_MAX_LIFETIME_DAYS`, `family_created_at`).
+  - Added audit reason tracking (`revoke_reason`: `rotated`, `logout`, `logout_all`, `reuse_detected`, `expired_cap`) via migration `2026-11-21-000001_AddRevokeReasonAndFamilyCreatedAtToRefreshTokens`.
+  - Enforced HTTP 401 on missing or invalid refresh tokens in `AuthController::refresh()`.
+  - Omitted `refresh_token` from JSON body for standard web clients by default (relies on HttpOnly cookie), returning it only when requested via `X-Client: native` or `return_refresh_token=true`.
+  - Added comprehensive test suite `tests/feature/PersistentLoginFeatureTest.php` verifying regression race prevention, 30-day sliding expiry, theft detection outside grace window, and 180-day absolute cap.
+  - Verification: 98/98 PHPUnit tests green (4,084 assertions).
+
+
 

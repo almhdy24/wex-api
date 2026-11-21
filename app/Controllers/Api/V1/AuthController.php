@@ -42,7 +42,7 @@ class AuthController extends BaseApiController
 
         $this->setRefreshTokenCookie($data['refresh_token'], (int) ($data['refresh_expires_in'] ?? 30 * 86400));
 
-        return $this->respondSuccess($data, 'تم تسجيل الدخول بنجاح');
+        return $this->respondSuccess($this->filterAuthData($data), 'تم تسجيل الدخول بنجاح');
     }
 
     /**
@@ -97,7 +97,7 @@ class AuthController extends BaseApiController
 
         $this->setRefreshTokenCookie($data['refresh_token'], (int) ($data['refresh_expires_in'] ?? 30 * 86400));
 
-        return $this->respondSuccess($data, 'تم تأكيد الرمز وتسجيل الدخول بنجاح');
+        return $this->respondSuccess($this->filterAuthData($data), 'تم تأكيد الرمز وتسجيل الدخول بنجاح');
     }
 
     /**
@@ -120,7 +120,7 @@ class AuthController extends BaseApiController
         }
 
         if (empty($refreshToken)) {
-            throw new ValidationFailedException(['refresh_token' => 'رمز التحديث مطلوب']);
+            throw new \App\Exceptions\UnauthorizedException(lang('Api.refresh_token_invalid'));
         }
 
         $userAgent = $this->request->getUserAgent()->getAgentString();
@@ -134,7 +134,7 @@ class AuthController extends BaseApiController
 
         $this->setRefreshTokenCookie($data['refresh_token'], (int) ($data['refresh_expires_in'] ?? 30 * 86400));
 
-        return $this->respondSuccess($data, 'تم تحديث جلسة الدخول بنجاح');
+        return $this->respondSuccess($this->filterAuthData($data), 'تم تحديث جلسة الدخول بنجاح');
     }
 
     /**
@@ -195,6 +195,10 @@ class AuthController extends BaseApiController
 
         $samesite = (string) env('COOKIE_SAMESITE', 'Lax');
 
+        if (strcasecmp($samesite, 'None') === 0 && !$secure) {
+            log_message('warning', 'SameSite=None cookies require the Secure attribute; set COOKIE_SECURE=true or serve over HTTPS.');
+        }
+
         $this->response->setCookie(
             'wex_refresh_token',
             $token,
@@ -235,5 +239,41 @@ class AuthController extends BaseApiController
             true,
             $samesite
         );
+    }
+
+    /**
+     * Determines whether refresh_token should be returned in JSON body.
+     * Web clients rely on HttpOnly cookie by default. Native/mobile clients
+     * may explicitly request the refresh_token via header or body flag.
+     */
+    protected function shouldReturnRefreshToken(): bool
+    {
+        $clientHeader = $this->request->getHeaderLine('X-Client');
+        if (strcasecmp($clientHeader, 'native') === 0) {
+            return true;
+        }
+
+        $body = $this->getJsonBody();
+        if (!empty($body['return_refresh_token'])) {
+            return true;
+        }
+
+        // Keep compatibility for non-cookie API clients passing refresh_token in request body
+        if (!empty($body['refresh_token'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Filters auth payload data before responding.
+     */
+    protected function filterAuthData(array $data): array
+    {
+        if (!$this->shouldReturnRefreshToken()) {
+            unset($data['refresh_token']);
+        }
+        return $data;
     }
 }
