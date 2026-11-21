@@ -117,20 +117,26 @@ class DashboardController extends BaseApiController
         $rateUpdatedAt = $this->pricingService->getRateUpdatedAt();
         $lockHours     = (int) $this->settingService->get('lock_hours', 4);
 
+        // 6. Data consistency check (cheap query)
+        $integrityService = new \App\Services\IntegrityService();
+        $inconsistencyCount = $integrityService->getCheapInconsistencyCount();
+
         $data = [
-            'orders_by_status'        => $statusCounts,
-            'pending_reviews_count'   => $pendingReviewsCount,
-            'today_orders'            => [
+            'orders_by_status'          => $statusCounts,
+            'pending_reviews_count'     => $pendingReviewsCount,
+            'inconsistent_orders_count' => $inconsistencyCount,
+            'integrity_warning'         => $inconsistencyCount > 0 ? "يوجد طلبات بحالة غير متسقة ({$inconsistencyCount})" : null,
+            'today_orders'              => [
                 'count'       => $todayOrdersCount,
                 'revenue_sdg' => $todayRevenueSdg,
             ],
-            'low_stock_threshold'     => $lowStockThreshold,
-            'low_stock_products'      => $formattedLowStock,
-            'exchange_rate'           => [
+            'low_stock_threshold'       => $lowStockThreshold,
+            'low_stock_products'        => $formattedLowStock,
+            'exchange_rate'             => [
                 'rate_sdg'   => $rateSdg,
                 'updated_at' => $rateUpdatedAt,
             ],
-            'price_lock_hours'        => $lockHours,
+            'price_lock_hours'          => $lockHours,
         ];
 
         return $this->respondSuccess($data, 'مؤشرات لوحة التحكم');

@@ -24,7 +24,9 @@ class AddPricesUpdatedAtAndOrderItemSdgColumns extends Migration
             ],
         ];
 
-        $this->forge->addColumn('order_items', $fields);
+        if (!$this->db->fieldExists('unit_price_sdg', 'order_items')) {
+            $this->forge->addColumn('order_items', $fields);
+        }
 
         // 2. Backfill existing order_items rows if any
         $orderItems = $this->db->table('order_items')->get()->getResultArray();

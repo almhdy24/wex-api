@@ -164,13 +164,15 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
         $this->forge->createTable('announcements', true);
 
         // 3. Add ticker_hidden to orders table
-        $this->forge->addColumn('orders', [
-            'ticker_hidden' => [
-                'type'       => 'TINYINT',
-                'constraint' => 1,
-                'default'    => 0,
-            ],
-        ]);
+        if (!$this->db->fieldExists('ticker_hidden', 'orders')) {
+            $this->forge->addColumn('orders', [
+                'ticker_hidden' => [
+                    'type'       => 'TINYINT',
+                    'constraint' => 1,
+                    'default'    => 0,
+                ],
+            ]);
+        }
 
         // 4. hero_slides table
         $this->forge->addField([

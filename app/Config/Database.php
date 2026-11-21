@@ -46,7 +46,7 @@ class Database extends Config
         'numberNative' => false,
         'foundRows'    => false,
         'foreignKeys'  => true,
-        'busyTimeout'  => 5000,
+        'busyTimeout'  => 30000,
         'synchronous'  => null,
         'dateFormat'   => [
             'date'     => 'Y-m-d',
@@ -80,7 +80,7 @@ class Database extends Config
         'failover'    => [],
         'port'        => 3306,
         'foreignKeys' => true,
-        'busyTimeout' => 1000,
+        'busyTimeout' => 30000,
         'synchronous' => null,
         'dateFormat'  => [
             'date'     => 'Y-m-d',

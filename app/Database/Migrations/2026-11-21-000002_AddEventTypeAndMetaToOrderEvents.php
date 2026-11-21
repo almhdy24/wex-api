@@ -23,7 +23,16 @@ class AddEventTypeAndMetaToOrderEvents extends Migration
             ],
         ];
 
-        $this->forge->addColumn('order_events', $fields);
+        $fieldsToAdd = [];
+        if (!$this->db->fieldExists('event_type', 'order_events')) {
+            $fieldsToAdd['event_type'] = $fields['event_type'];
+        }
+        if (!$this->db->fieldExists('meta', 'order_events')) {
+            $fieldsToAdd['meta'] = $fields['meta'];
+        }
+        if (!empty($fieldsToAdd)) {
+            $this->forge->addColumn('order_events', $fieldsToAdd);
+        }
 
         // Migrate existing events safely and clean up any literal UTC text
         $db = \Config\Database::connect();

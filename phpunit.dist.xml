@@ -13,16 +13,15 @@
 >
     <!-- Coverage disabled for fast Termux execution -->
     <testsuites>
-        <testsuite name="App">
-            <directory>./tests</directory>
+        <testsuite name="Feature">
+            <directory>./tests/feature</directory>
+        </testsuite>
+        <testsuite name="Unit">
+            <directory>./tests/unit</directory>
         </testsuite>
     </testsuites>
 
-    <logging>
-        <testdoxHtml outputFile="build/logs/testdox.html"/>
-        <testdoxText outputFile="build/logs/testdox.txt"/>
-        <junit outputFile="build/logs/logfile.xml"/>
-    </logging>
+    <!-- Logging disabled to prevent high memory accumulation on Termux -->
 
     <source>
         <include>

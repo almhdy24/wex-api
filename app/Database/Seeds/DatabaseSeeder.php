@@ -14,5 +14,10 @@ class DatabaseSeeder extends Seeder
         $this->call(BrandsSeeder::class);
         $this->call(ProductsSeeder::class);
         $this->call(AdminSeeder::class);
+
+        $env = getenv('CI_ENVIRONMENT') ?: (defined('ENVIRONMENT') ? ENVIRONMENT : 'development');
+        if (strtolower($env) !== 'production') {
+            $this->call(DevSeeder::class);
+        }
     }
 }
