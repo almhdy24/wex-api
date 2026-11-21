@@ -27,6 +27,7 @@ class ClaimsScanTest extends CIUnitTestCase
         'مضمون',
         '2849102',
         'WEX-DBG',
+        'فاتورة',
     ];
 
     public function testSeedsAndTemplatesContainZeroForbiddenClaims(): void

@@ -11,7 +11,7 @@ fi
 echo "=== Database Content Audit for Forbidden Claims & Sample Data ==="
 echo "Database: ${DB_PATH}"
 
-PATTERN="ضمان|فحص|معاينة|اختبار|تجربة|مختارة بعناية|استبدال|استرجاع|معتمد|وكيل|رسمي|مضمون|2849102|WEX-DBG|sample"
+PATTERN="ضمان|فحص|معاينة|اختبار|تجربة|مختارة بعناية|استبدال|استرجاع|معتمد|وكيل|رسمي|مضمون|2849102|WEX-DBG|sample|فاتورة"
 
 FOUND_COUNT=0
 

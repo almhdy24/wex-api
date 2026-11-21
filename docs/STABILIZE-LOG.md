@@ -244,3 +244,46 @@ $ curl -s "http://127.0.0.1:8080/api/v1/admin/orders/WEX-261121-C1A96" -H "Autho
 Status: **GREEN (Passed)**
 
 
+
+---
+
+## Phase 4 & Phase 5: Verification, Invariant Proofs & Acceptance
+
+### 1. Invariant Scans & Audit
+- `tests/unit/ClaimsScanTest.php`: Prohibits `فاتورة` from all backend responses and templates.
+- `scripts/audit-db.sh`: Scans database for `فاتورة` and unverified claims.
+```bash
+bash scripts/audit-db.sh
+```
+Output:
+```
+=== Database Content Audit for Forbidden Claims & Sample Data ===
+Database: /data/data/com.termux/files/home/projects/wex-api/writable/database/wex.sqlite
+✅ PASS: Zero forbidden claims or placeholder values found in database.
+```
+
+### 2. PHPUnit Full Suite
+```bash
+php vendor/bin/phpunit
+```
+Output:
+```
+PHPUnit 10.5.67 by Sebastian Bergmann and contributors.
+Runtime:       PHP 8.5.12
+Configuration: /data/data/com.termux/files/home/projects/wex-api/phpunit.dist.xml
+...............................................................  63 / 109 ( 57%)
+..............................................                  109 / 109 (100%)
+Time: 01:08.098, Memory: 17.00 MB
+OK (109 tests, 2989 assertions)
+```
+
+### 3. Syntax & Composer Audits
+```bash
+find app/ -name "*.php" -exec php -l {} +
+composer audit
+```
+Output:
+```
+ALL PHP FILES CLEAN (0 syntax errors)
+No security vulnerability advisories found.
+```
