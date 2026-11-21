@@ -176,6 +176,99 @@ final class DataConsistencyFlowTest extends CIUnitTestCase
 
         foreach ($timeline as $event) {
             $this->assertStringNotContainsString('UTC', $event['note'] ?? '');
+            $this->assertArrayHasKey('type', $event);
+            $this->assertArrayHasKey('meta', $event);
         }
+    }
+
+    public function testResetOrphanOrderReturnsToPendingPaymentWhenLockValid(): void
+    {
+        $order = $this->createTestOrder('payment_review');
+
+        // Order has status payment_review and 0 proofs
+        $result = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->adminToken,
+        ])->post("/api/v1/admin/orders/{$order->order_number}/reset-orphan");
+
+        $result->assertStatus(200);
+        $body = json_decode($result->getJSON(), true);
+        $this->assertSame('pending_payment', $body['data']['status']);
+        $this->assertSame('awaiting_proof', $body['data']['payment']['state']);
+        $this->assertTrue($body['data']['payment']['can_upload']);
+    }
+
+    public function testResetOrphanOrderExpiresWhenLockExpired(): void
+    {
+        $orderModel = new OrderModel();
+        $orderNumber = 'WEX-EXP-' . bin2hex(random_bytes(4));
+        $now = time();
+
+        $id = $orderModel->insert([
+            'order_number' => $orderNumber,
+            'user_id' => $this->customerUser->id,
+            'status' => 'payment_review',
+            'delivery_type' => 'pickup',
+            'delivery_phone' => '+249912345678',
+            'rate_sdg_snapshot' => 650,
+            'app_discount_percent_snapshot' => 0,
+            'subtotal_aed' => 50,
+            'subtotal_sdg' => 32500,
+            'discount_sdg' => 0,
+            'delivery_fee_sdg' => 0,
+            'total_sdg' => 32500,
+            'lock_expires_at' => gmdate('Y-m-d H:i:s', $now - 3600), // expired
+            'created_at' => gmdate('Y-m-d H:i:s', $now - 7200),
+        ]);
+
+        $result = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->adminToken,
+        ])->post("/api/v1/admin/orders/{$orderNumber}/reset-orphan");
+
+        $result->assertStatus(200);
+        $body = json_decode($result->getJSON(), true);
+        $this->assertSame('expired', $body['data']['status']);
+        $this->assertSame('expired', $body['data']['payment']['state']);
+    }
+
+    public function testFallbackCustomerNameNeverReturnsAmeel(): void
+    {
+        $userModel = new UserModel();
+        $email = 'testuser_' . bin2hex(random_bytes(4)) . '@example.com';
+        $userModel->insert([
+            'name'      => '',
+            'email'     => $email,
+            'phone'     => '+249999888777',
+            'role'      => Wex::ROLE_CUSTOMER,
+            'is_active' => true,
+        ]);
+        $user = $userModel->where('email', $email)->first();
+
+        $orderModel = new OrderModel();
+        $orderNumber = 'WEX-NO-NAME-' . bin2hex(random_bytes(3));
+        $orderModel->insert([
+            'order_number' => $orderNumber,
+            'user_id' => $user->id,
+            'status' => 'pending_payment',
+            'delivery_type' => 'pickup',
+            'delivery_phone' => '+249999888777',
+            'rate_sdg_snapshot' => 650,
+            'app_discount_percent_snapshot' => 0,
+            'subtotal_aed' => 50,
+            'subtotal_sdg' => 32500,
+            'discount_sdg' => 0,
+            'delivery_fee_sdg' => 0,
+            'total_sdg' => 32500,
+            'lock_expires_at' => gmdate('Y-m-d H:i:s', time() + 7200),
+            'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        $result = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->adminToken,
+        ])->get("/api/v1/admin/orders/{$orderNumber}");
+
+        $body = json_decode($result->getJSON(), true);
+        $this->assertNotSame('عميل', $body['data']['customer_name']);
+        $this->assertSame('+249999888777', $body['data']['customer_name']);
+        $this->assertSame('+249999888777', $body['data']['customer']['name']);
     }
 }
