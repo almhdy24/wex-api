@@ -17,6 +17,8 @@ class OrderEventModel extends Model
         'from_status',
         'to_status',
         'actor_user_id',
+        'event_type',
+        'meta',
         'note',
         'created_at',
     ];

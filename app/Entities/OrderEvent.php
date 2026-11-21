@@ -12,5 +12,7 @@ class OrderEvent extends Entity
         'id'            => 'integer',
         'order_id'      => 'integer',
         'actor_user_id' => '?integer',
+        'event_type'    => 'string',
+        'meta'          => '?string',
     ];
 }

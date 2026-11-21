@@ -29,6 +29,10 @@
   - Excluded debug orders (`WEX-DBG-%`) from status distribution metrics.
   - Verified with full PHPUnit suite passing 100/100 tests.
 
+- [x] **Phase 5: CI Workflow & Documentation (All GREEN)**
+  - Verified compatibility with GitHub Actions CI workflow runner.
+  - Documentation and test configurations aligned.
+
 ## (a) Phase Checklist
 
 - [x] **Phase 0: Setup**
