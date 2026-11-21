@@ -1,5 +1,13 @@
 # Wex Technology API - Project Progress Tracker
 
+## Stabilization Sprint (Branch: stabilize) — Active
+
+- [x] **Phase 1: Behavioral Checks (RED Baseline)**
+  - Built `scripts/audit-db.sh` for database claims, sample data, and `WEX-DBG-%` audit (RED on 15 rows)
+  - Built `tests/unit/ClaimsScanTest.php` in PHPUnit scanning seeds, migrations, language files, and email templates (RED on 6 violations)
+  - Synced E2E journey test `scripts/e2e.sh` verifying payment review lists and image streaming (RED on missing fields)
+  - Documented baseline failure logs in `docs/STABILIZE-LOG.md`.
+
 ## (a) Phase Checklist
 
 - [x] **Phase 0: Setup**
