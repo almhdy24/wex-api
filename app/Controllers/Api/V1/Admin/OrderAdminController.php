@@ -78,6 +78,9 @@ class OrderAdminController extends BaseApiController
         }
 
         $newStatus = trim((string) $payload['status']);
+        if ($newStatus === 'delivered') {
+            $newStatus = Wex::ORDER_STATUS_COMPLETED;
+        }
         if (!in_array($newStatus, Wex::ORDER_STATUSES, true)) {
             throw new ValidationFailedException('حالة الطلب المحددة غير صحيحة.', [
                 'status' => 'الحالة المحددة غير معروفة.',
