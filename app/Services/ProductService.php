@@ -182,6 +182,10 @@ class ProductService
     {
         $product = $this->productModel->where('slug', $slug)->where('is_active', 1)->first();
 
+        if (!$product && is_numeric($slug)) {
+            $product = $this->productModel->where('id', (int) $slug)->where('is_active', 1)->first();
+        }
+
         if (!$product) {
             throw new NotFoundException(lang('Api.product_not_found'));
         }

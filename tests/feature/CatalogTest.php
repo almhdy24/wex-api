@@ -84,6 +84,12 @@ final class CatalogTest extends CIUnitTestCase
 
         $this->assertIsArray($prod['accessories']);
         $this->assertCount(6, $prod['accessories']);
+
+        // Test fallback lookup by numeric id
+        $idResult = $this->get('api/v1/products/' . $prod['id']);
+        $idResult->assertStatus(200);
+        $idBody = json_decode($idResult->getJSON(), true);
+        $this->assertSame('dell-latitude-7490', $idBody['data']['slug']);
     }
 
     public function testAdminRoutesForbiddenForRegularCustomer(): void
