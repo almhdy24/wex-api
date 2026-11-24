@@ -51,6 +51,11 @@ class ProductImageAdminController extends BaseApiController
 
         $uploadList = is_array($files['images']) ? $files['images'] : [$files['images']];
 
+        $currentCount = $this->imageModel->where('product_id', $id)->countAllResults();
+        if ($currentCount + count($uploadList) > 10) {
+            throw new ValidationFailedException(['images' => 'الحد الأقصى للصور لكل جهاز هو 10 صور']);
+        }
+
         $hasPrimary = $this->imageModel
             ->where('product_id', $id)
             ->where('is_primary', 1)
@@ -63,6 +68,7 @@ class ProductImageAdminController extends BaseApiController
 
         $createdImages = [];
         $now = gmdate('Y-m-d H:i:s');
+        $altText = $this->request->getPost('alt');
 
         foreach ($uploadList as $file) {
             if (!$file->isValid()) {
@@ -82,6 +88,7 @@ class ProductImageAdminController extends BaseApiController
                 'thumb_path' => $stored['thumb_path'],
                 'sort_order' => ++$maxSort,
                 'is_primary' => $isPrimary,
+                'alt'        => $altText ? (string) $altText : null,
                 'created_at' => $now,
             ]);
 
@@ -89,6 +96,46 @@ class ProductImageAdminController extends BaseApiController
         }
 
         return $this->respondCreated($createdImages, lang('Api.image_uploaded'));
+    }
+
+    /**
+     * PUT /api/v1/admin/products/{id}/images/order
+     */
+    public function reorder(int $id): ResponseInterface
+    {
+        $product = $this->productModel->find($id);
+        if (!$product) {
+            throw new NotFoundException(lang('Api.product_not_found'));
+        }
+
+        $body = $this->getJsonBody();
+        $orderList = $body['order'] ?? $body;
+
+        if (is_array($orderList)) {
+            foreach ($orderList as $index => $item) {
+                if (is_numeric($item)) {
+                    $this->imageModel
+                        ->where('product_id', $id)
+                        ->where('id', (int) $item)
+                        ->set(['sort_order' => $index + 1])
+                        ->update();
+                } elseif (is_array($item) && isset($item['id'])) {
+                    $sortOrder = isset($item['sort_order']) ? (int) $item['sort_order'] : ($index + 1);
+                    $this->imageModel
+                        ->where('product_id', $id)
+                        ->where('id', (int) $item['id'])
+                        ->set(['sort_order' => $sortOrder])
+                        ->update();
+                }
+            }
+        }
+
+        $images = $this->imageModel
+            ->where('product_id', $id)
+            ->orderBy('sort_order', 'ASC')
+            ->findAll();
+
+        return $this->respondSuccess($images, 'تم تحديث ترتيب الصور بنجاح');
     }
 
     /**
@@ -113,6 +160,10 @@ class ProductImageAdminController extends BaseApiController
             $this->imageModel->update($imageId, ['is_primary' => 1]);
         }
 
+        if (isset($body['alt'])) {
+            $this->imageModel->update($imageId, ['alt' => trim((string) $body['alt'])]);
+        }
+
         if (isset($body['sort_order']) && is_numeric($body['sort_order'])) {
             $this->imageModel->update($imageId, ['sort_order' => (int) $body['sort_order']]);
         }
@@ -132,6 +183,8 @@ class ProductImageAdminController extends BaseApiController
             throw new NotFoundException('الصورة غير موجودة');
         }
 
+        $wasPrimary = (bool) $image->is_primary;
+
         // Delete files from disk
         if (!empty($image->path) && file_exists(FCPATH . $image->path)) {
             @unlink(FCPATH . $image->path);
@@ -141,6 +194,19 @@ class ProductImageAdminController extends BaseApiController
         }
 
         $this->imageModel->delete($imageId);
+
+        // If deleted image was primary, promote next available image
+        if ($wasPrimary) {
+            $nextImage = $this->imageModel
+                ->where('product_id', $id)
+                ->orderBy('sort_order', 'ASC')
+                ->orderBy('id', 'ASC')
+                ->first();
+
+            if ($nextImage) {
+                $this->imageModel->update($nextImage->id, ['is_primary' => 1]);
+            }
+        }
 
         return $this->respondSuccess(null, lang('Api.image_deleted'));
     }

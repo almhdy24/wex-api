@@ -161,6 +161,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
 
         // Product Images (Admin only)
         $routes->post('products/(:num)/images', 'Admin\ProductImageAdminController::upload/$1', ['filter' => 'role:admin']);
+        $routes->put('products/(:num)/images/order', 'Admin\ProductImageAdminController::reorder/$1', ['filter' => 'role:admin']);
         $routes->patch('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::update/$1/$2', ['filter' => 'role:admin']);
         $routes->delete('products/(:num)/images/(:num)', 'Admin\ProductImageAdminController::delete/$1/$2', ['filter' => 'role:admin']);
 

@@ -13,5 +13,6 @@ class ProductImage extends Entity
         'product_id' => 'integer',
         'sort_order' => 'integer',
         'is_primary' => 'boolean',
+        'alt'        => '?string',
     ];
 }

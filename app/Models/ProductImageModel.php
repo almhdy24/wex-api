@@ -18,6 +18,7 @@ class ProductImageModel extends Model
         'thumb_path',
         'sort_order',
         'is_primary',
+        'alt',
         'created_at',
     ];
 
