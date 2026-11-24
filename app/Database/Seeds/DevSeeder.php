@@ -21,7 +21,7 @@ class DevSeeder extends Seeder
         if ($hasAccount === 0) {
             $this->db->table('payment_accounts')->insert([
                 'bank_name'      => 'بنك الخرطوم (تطبيق بنكك)',
-                'account_name'   => 'Wex Technology - متجر التقنية',
+                'account_name'   => 'متجر التقنية',
                 'account_number' => '100200300',
                 'branch'         => 'الفرع الرئيسي - أم درمان',
                 'notes'          => 'يرجى كتابة رقم الطلب في خانة الملاحظات عند التحويل عبر تطبيق بنكك.',
