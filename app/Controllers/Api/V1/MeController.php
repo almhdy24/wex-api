@@ -179,11 +179,41 @@ class MeController extends BaseApiController
     {
         $user = $this->getCurrentUser();
 
-        // 1. Revoke all refresh tokens
-        $this->authService->logoutAll((int) $user->id);
+        $userId = (int) $user->id;
+        $now    = gmdate('Y-m-d H:i:s');
+        $db     = \Config\Database::connect();
 
-        // 2. Soft delete user record
-        $this->userModel->delete($user->id);
+        $db->transBegin();
+        try {
+            // 1. Revoke all refresh tokens
+            $this->authService->logoutAll($userId);
+
+            // 2. Stop push delivery to this account's devices
+            $db->table('push_subscriptions')
+                ->where('user_id', $userId)
+                ->update(['is_active' => 0, 'updated_at' => $now]);
+
+            // 3. Anonymise PII and free the unique email/google_id so the person can sign up
+            //    again later (a soft delete kept them and made re-registration a 500).
+            //    Orders keep user_id for accounting; their delivery_phone stays on the order.
+            $this->userModel->update($userId, [
+                'name'       => 'حساب محذوف',
+                'email'      => "deleted+{$userId}@deleted.invalid",
+                'phone'      => null,
+                'google_id'  => null,
+                'avatar_url' => null,
+                'is_active'  => 0,
+                'updated_at' => $now,
+            ]);
+
+            // 4. Soft delete user record
+            $this->userModel->delete($userId);
+
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
 
         return $this->respondSuccess(null, lang('Api.account_deleted'));
     }
