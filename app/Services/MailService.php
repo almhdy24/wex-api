@@ -107,6 +107,12 @@ class MailService
         $failedCount = 0;
 
         foreach ($pending as $item) {
+            // Lease the row first: overlapping mail:send runs (cron + slow SMTP) must not
+            // both send it. A crashed run's row becomes available again after the lease.
+            if (!$this->claim((int) $item->id)) {
+                continue;
+            }
+
             $html = '';
             try {
                 $payload = $item->getPayload();
@@ -138,6 +144,19 @@ class MailService
         }
 
         return ['sent' => $sentCount, 'failed' => $failedCount];
+    }
+
+    public const CLAIM_LEASE_SECONDS = 600;
+
+    protected function claim(int $id): bool
+    {
+        $this->outbox->builder()
+            ->where('id', $id)
+            ->where('status', Wex::EMAIL_STATUS_PENDING)
+            ->where('available_at <=', gmdate('Y-m-d H:i:s'))
+            ->update(['available_at' => gmdate('Y-m-d H:i:s', time() + self::CLAIM_LEASE_SECONDS)]);
+
+        return $this->outbox->db->affectedRows() === 1;
     }
 
     /**
