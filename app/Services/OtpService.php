@@ -21,6 +21,7 @@ class OtpService
     protected int $ttlSeconds = 600; // 10 minutes
     protected int $cooldownSeconds = 60; // 60 seconds
     protected int $maxAttempts = 5;
+    protected int $maxCodesPerHour = 5;
 
     public function __construct(?OtpCodeModel $otpModel = null)
     {
@@ -46,10 +47,21 @@ class OtpService
             ->orderBy('id', 'DESC')
             ->first();
 
-        $isLocalDev = (ENVIRONMENT === 'testing' || (ENVIRONMENT === 'development' && ($ip === '127.0.0.1' || $ip === '::1' || $ip === 'localhost' || $ip === null)));
+        $isLocalDev = $this->isRateLimitExempt($ip);
         if (!$isLocalDev && $latest && (strtotime($latest->created_at) + $this->cooldownSeconds) > $now) {
             $waitSeconds = ($this->cooldownSeconds - ($now - strtotime($latest->created_at)));
             throw new TooManyRequestsException($waitSeconds, lang('Api.otp_cooldown'));
+        }
+
+        // 1b. Per-email hourly cap (independent of client IP) to bound brute-force via code rotation
+        if (!$isLocalDev) {
+            $issuedLastHour = $this->otpModel
+                ->where('email', $email)
+                ->where('created_at >=', gmdate('Y-m-d H:i:s', $now - 3600))
+                ->countAllResults();
+            if ($issuedLastHour >= $this->maxCodesPerHour) {
+                throw new TooManyRequestsException(3600, 'تجاوزت الحد المسموح من طلبات رمز التحقق، يرجى المحاولة لاحقاً.');
+            }
         }
 
         // 2. Invalidate any existing active codes for this email (only the latest is valid)
@@ -74,6 +86,15 @@ class OtpService
         ]);
 
         return $rawCode;
+    }
+
+    /**
+     * Cooldown / hourly caps are skipped only for automated tests and loopback development.
+     */
+    protected function isRateLimitExempt(?string $ip): bool
+    {
+        return ENVIRONMENT === 'testing'
+            || (ENVIRONMENT === 'development' && in_array($ip, ['127.0.0.1', '::1', 'localhost', null], true));
     }
 
     /**
@@ -106,26 +127,38 @@ class OtpService
             throw new ValidationFailedException(['code' => lang('Api.otp_max_attempts')]);
         }
 
+        $db = $this->otpModel->db;
+        $table = $this->otpModel->getTable();
+
+        // Reserve one attempt atomically BEFORE comparing, so concurrent guesses can never
+        // exceed maxAttempts (check-then-increment would let N parallel requests all pass).
+        $db->query(
+            "UPDATE {$table} SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL",
+            [$record->id, $this->maxAttempts]
+        );
+        if ($db->affectedRows() !== 1) {
+            throw new ValidationFailedException(['code' => lang('Api.otp_max_attempts')]);
+        }
+
         $expectedHash = hash_hmac('sha256', $code, $this->secretKey);
 
         if (!hash_equals($record->code_hash, $expectedHash)) {
-            // Increment wrong attempts
-            $newAttempts = $record->attempts + 1;
-            $this->otpModel->update($record->id, [
-                'attempts' => $newAttempts,
-            ]);
-
-            if ($newAttempts >= $this->maxAttempts) {
+            if ((int) $record->attempts + 1 >= $this->maxAttempts) {
                 throw new ValidationFailedException(['code' => lang('Api.otp_max_attempts')]);
             }
 
             throw new ValidationFailedException(['code' => lang('Api.otp_invalid')]);
         }
 
-        // Mark code as consumed (single-use)
-        $this->otpModel->update($record->id, [
-            'consumed_at' => gmdate('Y-m-d H:i:s'),
-        ]);
+        // Mark code as consumed (single-use) atomically: a concurrent request with the same
+        // valid code must not be able to log in a second time.
+        $db->query(
+            "UPDATE {$table} SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL",
+            [gmdate('Y-m-d H:i:s'), $record->id]
+        );
+        if ($db->affectedRows() !== 1) {
+            throw new ValidationFailedException(['code' => lang('Api.otp_invalid')]);
+        }
 
         return true;
     }
