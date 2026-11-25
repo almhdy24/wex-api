@@ -53,6 +53,7 @@ class SettingService
         'inspection_note',
         'returns_note',
         'extra_delivery_note',
+        'push_enabled',
     ];
 
     public function __construct(

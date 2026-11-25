@@ -1,5 +1,14 @@
 # Wex Technology API - Project Progress Tracker
 
+## Push Notification System Sprint (Branch: stabilize) — Active
+
+- [x] **Phase 1: Backend Core (`wex-api`)**
+  - Installed `minishlink/web-push` via Composer.
+  - Created migration `2026-11-25-000001_CreatePushNotificationTables.php` (`push_subscriptions`, `notification_preferences`, `push_outbox`, and extended `notifications` with `data_json`, `channel_flags`). Verified via `php spark migrate`.
+  - Implemented `PushProviderInterface`, `PushResult`, `WebPushProvider`, `FcmProvider` (fully coded HTTP v1 with OAuth2 token caching, disabled unless `FCM_ENABLED=true`), and `FakeProvider`.
+  - Implemented `PushService` (single source of truth with `NotificationService`, preferences, global `push_enabled` kill switch, inline delivery cap 20, outbox retries with exponential backoff, 404/410 & UNREGISTERED deactivation, order tag coalescing).
+  - Added `PushController`, `PushAdminController`, `Routes.php` entries, `PushTemplates.php`, `push:keys`, `push:work`, `push:fcm-test`.
+
 ## Stabilization Sprint (Branch: stabilize) — Active
 
 - [x] **Phase 1: Behavioral Checks (RED Baseline)**

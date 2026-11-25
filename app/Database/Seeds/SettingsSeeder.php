@@ -22,6 +22,7 @@ class SettingsSeeder extends Seeder
             ['key' => 'shop_phone',              'value' => '+249 9XX XXX XXX'],
             ['key' => 'shop_whatsapp',           'value' => '249912345678'],
             ['key' => 'working_hours',           'value' => 'من 10 صباحاً إلى 10 مساءً، عدا الجمعة'],
+            ['key' => 'push_enabled',            'value' => '1'],
         ];
 
         foreach ($settings as $setting) {

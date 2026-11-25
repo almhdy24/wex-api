@@ -18,4 +18,13 @@ class Notification extends Entity
     {
         return !empty($this->attributes['read_at']);
     }
+
+    public function getDataArray(): array
+    {
+        if (empty($this->attributes['data_json'])) {
+            return [];
+        }
+        $decoded = json_decode($this->attributes['data_json'], true);
+        return is_array($decoded) ? $decoded : [];
+    }
 }

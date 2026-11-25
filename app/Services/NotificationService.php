@@ -18,19 +18,30 @@ class NotificationService
     protected NotificationModel $notifications;
     protected UserModel $users;
     protected MailService $mailService;
+    protected ?PushService $pushService;
 
     public function __construct(
         ?NotificationModel $notifications = null,
         ?UserModel $users = null,
-        ?MailService $mailService = null
+        ?MailService $mailService = null,
+        ?PushService $pushService = null
     ) {
         $this->notifications = $notifications ?? new NotificationModel();
         $this->users         = $users ?? new UserModel();
         $this->mailService   = $mailService ?? new MailService();
+        $this->pushService   = $pushService;
+    }
+
+    protected function getPushService(): PushService
+    {
+        if ($this->pushService === null) {
+            $this->pushService = new PushService();
+        }
+        return $this->pushService;
     }
 
     /**
-     * Dispatch an in-app notification to a user, and optionally enqueue an email.
+     * Dispatch an in-app notification to a user, and optionally enqueue an email and push.
      */
     public function notify(
         int $userId,
@@ -39,19 +50,31 @@ class NotificationService
         string $body,
         ?int $orderId = null,
         ?string $emailTemplate = null,
-        array $emailPayload = []
+        array $emailPayload = [],
+        array $pushOptions = []
     ): Notification {
         $now = gmdate('Y-m-d H:i:s');
+        $orderNumber = $pushOptions['order_number'] ?? ($emailPayload['order_number'] ?? null);
+        $url = $pushOptions['url'] ?? ($orderNumber ? "/orders/{$orderNumber}" : '/notifications');
+
+        $dataJson = array_filter([
+            'type'         => $type,
+            'order_id'     => $orderId,
+            'order_number' => $orderNumber,
+            'url'          => $url,
+        ], static fn ($v) => $v !== null);
 
         // 1. Create in-app notification record
         $notification = new Notification([
-            'user_id'    => $userId,
-            'type'       => $type,
-            'title'      => $title,
-            'body'       => $body,
-            'order_id'   => $orderId,
-            'read_at'    => null,
-            'created_at' => $now,
+            'user_id'       => $userId,
+            'type'          => $type,
+            'title'         => $title,
+            'body'          => $body,
+            'order_id'      => $orderId,
+            'data_json'     => json_encode($dataJson, JSON_UNESCAPED_UNICODE),
+            'channel_flags' => 'in_app',
+            'read_at'       => null,
+            'created_at'    => $now,
         ]);
 
         $id = $this->notifications->insert($notification);
@@ -72,6 +95,26 @@ class NotificationService
             );
         }
 
+        // 3. Dispatch push notification channel (non-blocking / best-effort)
+        if (empty($pushOptions['skip_push'])) {
+            try {
+                $this->getPushService()->sendToUser($userId, array_merge($pushOptions, [
+                    'notification_id' => (int) $saved->id,
+                    'type'            => $type,
+                    'title'           => $title,
+                    'body'            => $body,
+                    'order_id'        => $orderId,
+                    'order_number'    => $orderNumber,
+                    'url'             => $url,
+                ]));
+            } catch (\Throwable $e) {
+                log_message('warning', 'Push dispatch failed for notification {id}: {msg}', [
+                    'id'  => $saved->id,
+                    'msg' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return $saved;
     }
 
@@ -90,15 +133,18 @@ class NotificationService
         $rows = $builder->orderBy('id', 'DESC')->findAll($perPage, $offset);
 
         $items = array_map(function (Notification $n) {
+            $data = $n->getDataArray();
             return [
-                'id'         => $n->id,
-                'type'       => $n->type,
-                'title'      => $n->title,
-                'body'       => $n->body,
-                'order_id'   => $n->order_id,
-                'is_read'    => $n->isRead(),
-                'read_at'    => $n->read_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($n->read_at)) : null,
-                'created_at' => $n->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($n->created_at)) : null,
+                'id'           => $n->id,
+                'type'         => $n->type,
+                'title'        => $n->title,
+                'body'         => $n->body,
+                'order_id'     => $n->order_id,
+                'order_number' => $data['order_number'] ?? null,
+                'data'         => $data,
+                'is_read'      => $n->isRead(),
+                'read_at'      => $n->read_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($n->read_at)) : null,
+                'created_at'   => $n->created_at ? gmdate('Y-m-d\TH:i:s\Z', strtotime($n->created_at)) : null,
             ];
         }, $rows);
 

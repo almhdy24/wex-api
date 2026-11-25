@@ -18,6 +18,8 @@ class NotificationModel extends Model
         'title',
         'body',
         'order_id',
+        'data_json',
+        'channel_flags',
         'read_at',
         'created_at',
     ];

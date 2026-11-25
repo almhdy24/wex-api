@@ -51,6 +51,18 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->post('mark-all-read', 'NotificationController::markAllRead');
     });
 
+    // Push Notifications (Authenticated + Rate Limited)
+    $routes->group('push', ['filter' => ['auth', 'throttle:60,60,push']], static function (RouteCollection $routes) {
+        $routes->get('config', 'PushController::config');
+        $routes->get('subscriptions', 'PushController::listSubscriptions');
+        $routes->post('subscriptions', 'PushController::subscribe');
+        $routes->delete('subscriptions', 'PushController::unsubscribe');
+        $routes->delete('subscriptions/(:num)', 'PushController::deleteSubscription/$1');
+        $routes->get('preferences', 'PushController::getPreferences');
+        $routes->put('preferences', 'PushController::updatePreferences');
+        $routes->post('test', 'PushController::sendTest', ['filter' => ['auth', 'throttle:10,60,push_test']]);
+    });
+
     // Public Catalog
     $routes->get('shop', 'SettingsController::shop');
     $routes->get('categories', 'CategoryController::index');
@@ -183,6 +195,14 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         // Settings & Operational Configuration (Admin only)
         $routes->get('settings', 'Admin\SettingAdminController::index', ['filter' => 'role:admin']);
         $routes->patch('settings', 'Admin\SettingAdminController::update', ['filter' => 'role:admin']);
+
+        // Push Notifications Admin (Admin only)
+        $routes->post('push/broadcast', 'Admin\PushAdminController::broadcast', ['filter' => 'role:admin']);
+        $routes->get('push/stats', 'Admin\PushAdminController::stats', ['filter' => 'role:admin']);
+        $routes->get('push/log', 'Admin\PushAdminController::log', ['filter' => 'role:admin']);
+        $routes->put('push/settings', 'Admin\PushAdminController::updateSettings', ['filter' => 'role:admin']);
+        $routes->get('push/fake-log', 'Admin\PushAdminController::fakeLog', ['filter' => 'role:admin']);
+        $routes->delete('push/fake-log', 'Admin\PushAdminController::fakeLog', ['filter' => 'role:admin']);
 
         // Exchange Rates (AED -> SDG) (Admin only)
         $routes->get('rates', 'Admin\RateAdminController::index', ['filter' => 'role:admin']);
