@@ -211,15 +211,32 @@ class PaymentProofService
 
         // Notify customer that proof was received and is under review
         try {
+            $tpl = \Config\PushTemplates::render('payment_proof_uploaded', ['order_number' => $orderNumber]);
             $this->notificationService->notify(
                 userId: $userId,
                 type: 'payment_proof_uploaded',
-                title: 'تم استلام إشعار التحويل البنكي',
-                body: "تم استلام إشعار التحويل للطلب رقم {$orderNumber} وجاري مراجعته وتأكيده.",
+                title: $tpl['title'],
+                body: $tpl['body'],
                 orderId: (int) $order->id,
                 emailTemplate: 'payment_received',
-                emailPayload: ['order_number' => $orderNumber]
+                emailPayload: ['order_number' => $orderNumber],
+                pushOptions: [
+                    'order_number'          => $orderNumber,
+                    'url'                   => "/orders/{$orderNumber}",
+                    'expected_order_status' => Wex::ORDER_STATUS_PAYMENT_REVIEW,
+                ]
             );
+
+            $adminTpl = \Config\PushTemplates::render('admin_receipt_uploaded', ['order_number' => $orderNumber]);
+            (new PushService())->sendToRole([Wex::ROLE_ADMIN, Wex::ROLE_STAFF], [
+                'type'          => 'admin_receipt_uploaded',
+                'title'         => $adminTpl['title'],
+                'body'          => $adminTpl['body'],
+                'order_id'      => (int) $order->id,
+                'order_number'  => $orderNumber,
+                'url'           => "/admin/orders/{$orderNumber}",
+                'actor_user_id' => $userId,
+            ]);
         } catch (\Throwable $e) {
             log_message('warning', 'Failed to dispatch payment_proof_uploaded notification: {msg}', ['msg' => $e->getMessage()]);
         }
@@ -464,20 +481,28 @@ class PaymentProofService
         // Send review notification
         try {
             if ($action === 'approve') {
+                $tpl = \Config\PushTemplates::render('payment_approved', ['order_number' => $orderNumber]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'payment_approved',
-                    title: 'تم تأكيد دفع الطلب بنجاح',
-                    body: "تمت مراجعة التحويل البنكي وتأكيد طلبك رقم {$orderNumber}.",
+                    title: $tpl['title'],
+                    body: $tpl['body'],
                     orderId: (int) $order->id,
                     emailTemplate: 'payment_approved',
                     emailPayload: [
                         'order_number'  => $orderNumber,
                         'total_sdg'     => (int) $order->total_sdg,
                         'delivery_type' => $order->delivery_type,
+                    ],
+                    pushOptions: [
+                        'order_number'          => $orderNumber,
+                        'url'                   => "/orders/{$orderNumber}",
+                        'actor_user_id'         => $reviewerUserId,
+                        'expected_order_status' => Wex::ORDER_STATUS_CONFIRMED,
                     ]
                 );
             } else {
+                $pushTpl = \Config\PushTemplates::render('payment_rejected', ['order_number' => $orderNumber]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'payment_rejected',
@@ -488,6 +513,13 @@ class PaymentProofService
                     emailPayload: [
                         'order_number' => $orderNumber,
                         'reason'       => $reviewNote,
+                    ],
+                    pushOptions: [
+                        'order_number'  => $orderNumber,
+                        'url'           => "/orders/{$orderNumber}",
+                        'actor_user_id' => $reviewerUserId,
+                        'push_title'    => $pushTpl['title'],
+                        'push_body'     => $pushTpl['body'],
                     ]
                 );
             }

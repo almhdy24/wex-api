@@ -2,6 +2,11 @@
 
 ## Push Notification System Sprint (Branch: stabilize) — Active
 
+- [x] **Phase 2: Event Wiring (`wex-api`)**
+  - Wired `OrderService` (`order_created`, `order_confirmed`, `order_ready_pickup`, `order_out_delivery`, `order_completed`, `order_cancelled`, `order_expired`, `admin_new_order`, `admin_low_stock`) and `PaymentProofService` (`payment_proof_uploaded`, `admin_receipt_uploaded`, `payment_approved`, `payment_rejected` with reason in-app only).
+  - Created `app/Commands/PushReminders.php` (`php spark push:reminders`) for `price_lock_expiring` (60m/15m) and `admin_payment_reminder` (>30m).
+  - Centralized Arabic Fusha copy in `app/Config/PushTemplates.php` with zero sensitive data.
+
 - [x] **Phase 1: Backend Core (`wex-api`)**
   - Installed `minishlink/web-push` via Composer.
   - Created migration `2026-11-25-000001_CreatePushNotificationTables.php` (`push_subscriptions`, `notification_preferences`, `push_outbox`, and extended `notifications` with `data_json`, `channel_flags`). Verified via `php spark migrate`.

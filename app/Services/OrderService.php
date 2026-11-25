@@ -172,6 +172,8 @@ class OrderService
             $roundingStep    = $this->pricingService->getRoundingStepSdg();
 
             $orderItemsToInsert = [];
+            $lowStockProducts = [];
+            $lowStockThreshold = (int) $this->settingService->get('low_stock_threshold', 2);
             $subtotalAed = 0;
             $subtotalSdg = 0;
 
@@ -190,6 +192,14 @@ class OrderService
 
                 if ($db->affectedRows() !== 1) {
                     throw new ConflictException("المنتج '{$product->name}' لم يعد متوفراً بالكمية المطلوبة ({$qty} قطع).");
+                }
+
+                $newStock = (int) $product->stock_quantity - $qty;
+                if ((int) $product->stock_quantity > $lowStockThreshold && $newStock <= $lowStockThreshold) {
+                    $lowStockProducts[] = [
+                        'id'   => (int) $productId,
+                        'name' => (string) $product->name,
+                    ];
                 }
 
                 $unitPriceAed = (int) $product->price_aed;
@@ -286,11 +296,12 @@ class OrderService
 
         // Send order created notification
         try {
+            $tpl = \Config\PushTemplates::render('order_created', ['order_number' => $orderNumber]);
             $this->notificationService->notify(
                 userId: $userId,
                 type: 'order_created',
-                title: 'تم استلام طلبك بنجاح',
-                body: "تم استلام طلبك رقم {$orderNumber} وحجز السعر بالجنيه السوداني.",
+                title: $tpl['title'],
+                body: $tpl['body'],
                 orderId: (int) $orderId,
                 emailTemplate: 'order_created',
                 emailPayload: [
@@ -300,8 +311,36 @@ class OrderService
                     'lock_expires_at'     => gmdate('Y-m-d H:i', strtotime($lockExpiresAt)),
                     'bank_account_name'   => $this->settingService->get('bank_account_name'),
                     'bank_account_number' => $this->settingService->get('bank_account_number'),
+                ],
+                pushOptions: [
+                    'order_number'          => $orderNumber,
+                    'url'                   => "/orders/{$orderNumber}",
+                    'expected_order_status' => Wex::ORDER_STATUS_PENDING_PAYMENT,
                 ]
             );
+
+            $pushService = new PushService();
+            $adminTpl = \Config\PushTemplates::render('admin_new_order', ['order_number' => $orderNumber]);
+            $pushService->sendToRole([Wex::ROLE_ADMIN, Wex::ROLE_STAFF], [
+                'type'          => 'admin_new_order',
+                'title'         => $adminTpl['title'],
+                'body'          => $adminTpl['body'],
+                'order_id'      => (int) $orderId,
+                'order_number'  => $orderNumber,
+                'url'           => "/admin/orders/{$orderNumber}",
+                'actor_user_id' => $userId,
+            ]);
+
+            foreach ($lowStockProducts as $ls) {
+                $lsTpl = \Config\PushTemplates::render('admin_low_stock', ['product_name' => $ls['name']]);
+                $pushService->sendToRole([Wex::ROLE_ADMIN, Wex::ROLE_STAFF], [
+                    'type'  => 'admin_low_stock',
+                    'title' => $lsTpl['title'],
+                    'body'  => $lsTpl['body'],
+                    'url'   => '/admin/products',
+                    'tag'   => 'low-stock-' . $ls['id'],
+                ]);
+            }
         } catch (\Throwable $e) {
             log_message('warning', 'Failed to dispatch order_created notification: {msg}', ['msg' => $e->getMessage()]);
         }
@@ -360,15 +399,21 @@ class OrderService
 
             // Send notification for expired order
             try {
+                $tpl = \Config\PushTemplates::render('order_expired', ['order_number' => $order->order_number]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'order_expired',
-                    title: 'انتهاء فترة حجز السعر للطلب',
-                    body: "تم إلغاء الطلب رقم {$order->order_number} لانتهاء فترة حجز السعر المحددة.",
+                    title: $tpl['title'],
+                    body: $tpl['body'],
                     orderId: (int) $order->id,
                     emailTemplate: 'order_expired',
                     emailPayload: [
                         'order_number' => $order->order_number,
+                    ],
+                    pushOptions: [
+                        'order_number'          => $order->order_number,
+                        'url'                   => "/orders/{$order->order_number}",
+                        'expected_order_status' => Wex::ORDER_STATUS_EXPIRED,
                     ]
                 );
             } catch (\Throwable $e) {
@@ -969,39 +1014,51 @@ class OrderService
 
         // Send status change notification
         try {
+            $pushOpts = [
+                'order_number'          => $orderNumber,
+                'url'                   => "/orders/{$orderNumber}",
+                'actor_user_id'         => $actorUserId,
+                'expected_order_status' => $newStatus,
+            ];
+
             if ($newStatus === Wex::ORDER_STATUS_CONFIRMED) {
+                $tpl = \Config\PushTemplates::render('order_confirmed', ['order_number' => $orderNumber]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'order_confirmed',
-                    title: 'تم تأكيد طلبك بنجاح',
-                    body: "تم تأكيد طلبك رقم {$orderNumber} وجاري تجهيزه.",
+                    title: $tpl['title'],
+                    body: $tpl['body'],
                     orderId: (int) $order->id,
                     emailTemplate: 'payment_approved',
                     emailPayload: [
                         'order_number'  => $orderNumber,
                         'total_sdg'     => (int) $order->total_sdg,
                         'delivery_type' => $order->delivery_type,
-                    ]
+                    ],
+                    pushOptions: $pushOpts
                 );
             } elseif ($newStatus === Wex::ORDER_STATUS_READY_FOR_PICKUP) {
+                $tpl = \Config\PushTemplates::render('order_ready_pickup', ['order_number' => $orderNumber]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'order_ready_pickup',
-                    title: 'طلبك جاهز للاستلام من المحل',
-                    body: "طلبك رقم {$orderNumber} جاهز الآن للاستلام من فرع أم درمان.",
+                    title: $tpl['title'],
+                    body: $tpl['body'],
                     orderId: (int) $order->id,
                     emailTemplate: 'ready_for_pickup',
                     emailPayload: [
                         'order_number' => $orderNumber,
                         'shop_phone'   => $this->settingService->get('shop_phone'),
-                    ]
+                    ],
+                    pushOptions: $pushOpts
                 );
             } elseif ($newStatus === Wex::ORDER_STATUS_OUT_FOR_DELIVERY) {
+                $tpl = \Config\PushTemplates::render('order_out_delivery', ['order_number' => $orderNumber]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'order_out_delivery',
-                    title: 'طلبك في الطريق إليك مع المندوب',
-                    body: "طلبك رقم {$orderNumber} خرج مع مندوب التوصيل.",
+                    title: $tpl['title'],
+                    body: $tpl['body'],
                     orderId: (int) $order->id,
                     emailTemplate: 'out_for_delivery',
                     emailPayload: [
@@ -1009,20 +1066,33 @@ class OrderService
                         'courier_name'     => $updateData['courier_name'] ?? null,
                         'courier_phone'    => $updateData['courier_phone'] ?? null,
                         'delivery_address' => $order->delivery_address,
-                    ]
+                    ],
+                    pushOptions: $pushOpts
                 );
             } elseif ($newStatus === Wex::ORDER_STATUS_COMPLETED) {
+                $tpl = \Config\PushTemplates::render('order_completed', ['order_number' => $orderNumber]);
                 $this->notificationService->notify(
                     userId: (int) $order->user_id,
                     type: 'order_completed',
-                    title: 'تم تسليم طلبك بنجاح',
-                    body: "تم تسليم طلبك رقم {$orderNumber} بنجاح. شكراً لثقتك في ويكس تكنولوجي.",
+                    title: $tpl['title'],
+                    body: $tpl['body'],
                     orderId: (int) $order->id,
                     emailTemplate: 'order_completed',
                     emailPayload: [
                         'order_number' => $orderNumber,
                         'total_sdg'    => (int) $order->total_sdg,
-                    ]
+                    ],
+                    pushOptions: $pushOpts
+                );
+            } elseif ($newStatus === Wex::ORDER_STATUS_CANCELLED) {
+                $tpl = \Config\PushTemplates::render('order_cancelled', ['order_number' => $orderNumber]);
+                $this->notificationService->notify(
+                    userId: (int) $order->user_id,
+                    type: 'order_cancelled',
+                    title: $tpl['title'],
+                    body: $tpl['body'],
+                    orderId: (int) $order->id,
+                    pushOptions: $pushOpts
                 );
             }
         } catch (\Throwable $e) {

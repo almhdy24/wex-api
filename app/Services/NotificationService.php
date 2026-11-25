@@ -62,6 +62,7 @@ class NotificationService
             'order_id'     => $orderId,
             'order_number' => $orderNumber,
             'url'          => $url,
+            'tag'          => $pushOptions['tag'] ?? null,
         ], static fn ($v) => $v !== null);
 
         // 1. Create in-app notification record
