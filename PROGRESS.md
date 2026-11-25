@@ -1,5 +1,17 @@
 # Wex Technology API - Project Progress Tracker
 
+## Production Readiness Sprint (HelioHost + UX + Copy) — Active (started 2026-11-25)
+
+Phase 0 (truth & green):
+- [x] e2e 03 (mobile card tap dead -> DataList fix), 06 (heading), 07 (deterministic IA check), 02 (order number lookup), stock headroom in CI seed. e2e GREEN run 45632864710.
+- [x] Snapshot harness SW blocked; ui-check backend config (CORS/ERR_FAILED root cause), php -S on 127.0.0.1.
+- [x] VIS-05 = fixture artifact (API verified by test); fixtures fixed.
+- [ ] VIS-06 verify from next snapshot screenshots.
+- [x] PHPUnit on SQLite + MySQL 8 + MariaDB 10.6: 161 tests green on all (run 45632966956).
+- [x] D-5 exception headers, upload pixel limit + no copy fallback, D-10 ResponseContractTest (+ shipping_zone_name, brand_name, delivery_type fixes), D-8 N+1, D-7 index, D-9 memo, D-6 axios removed, GET de-dup.
+Next: Phase 1 HelioHost layout/packaging.
+
+
 ## Deep Review & Hardening Pass (Branch: stabilize) — Active (started 2026-11-25)
 
 Resume notes: full findings table is now in docs/CODE_REVIEW.md; coverage in docs/REVIEW_COVERAGE.md; map in docs/SYSTEM_MAP.md.
