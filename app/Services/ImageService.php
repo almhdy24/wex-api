@@ -96,7 +96,7 @@ class ImageService
         $destPath = $uploadDir . '/' . $fileName;
 
         // Re-encode with GD to strip EXIF and prevent execution (falls back to direct copy if GD fails)
-        $this->reencodeAndResize($file->getTempName(), $destPath, 2000, 2000);
+        $this->reencodeAndResize($file->getTempName(), $destPath, 2000, 2000, 'proof_image');
 
         return 'uploads/proofs/' . $fileName;
     }
@@ -180,18 +180,30 @@ class ImageService
     }
 
     /**
-     * Reads image, resizes if larger than max dimensions, and writes fresh re-encoded image.
-     * Falls back to copying validated original if GD lacks format or processing fails.
+     * Reads image dimensions WITHOUT decoding, rejects oversized pixel counts
+     * (decompression bombs), then re-encodes with GD (strips EXIF and any payload).
+     * There is deliberately no "copy the original" fallback: a file GD cannot decode
+     * is rejected, never stored as-is.
      */
-    protected function reencodeAndResize(string $sourcePath, string $targetPath, int $maxWidth, int $maxHeight): void
+    protected function reencodeAndResize(string $sourcePath, string $targetPath, int $maxWidth, int $maxHeight, string $field = 'image'): void
     {
+        $reject = static function (string $msg) use ($field): void {
+            throw new ValidationFailedException([$field => $msg], $msg);
+        };
+
         $imageInfo = @getimagesize($sourcePath);
-        if (!$imageInfo) {
-            log_message('warning', 'GD getimagesize failed on validated file: {path}, falling back to direct copy', ['path' => $sourcePath]);
-            if (!copy($sourcePath, $targetPath)) {
-                throw new ValidationFailedException(['proof_image' => 'فشل في حفظ ملف الإشعار']);
-            }
-            return;
+        if (!$imageInfo || empty($imageInfo[0]) || empty($imageInfo[1])) {
+            $reject('تعذّرت قراءة الصورة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP.');
+        }
+
+        $maxPixels = max(1, (int) env('UPLOAD_MAX_PIXELS', 40_000_000));
+        if ((int) $imageInfo[0] * (int) $imageInfo[1] > $maxPixels) {
+            $reject('أبعاد الصورة كبيرة جداً، يرجى رفع صورة أصغر.');
+        }
+
+        if (!extension_loaded('gd')) {
+            log_message('critical', 'GD extension is not loaded; image uploads are rejected.');
+            $reject('تعذّرت معالجة الصورة على الخادم حالياً، يرجى المحاولة لاحقاً.');
         }
 
         $srcWidth  = $imageInfo[0];
@@ -207,11 +219,8 @@ class ImageService
         };
 
         if (!$srcImg) {
-            log_message('warning', 'GD imagecreate failed for mime {mime}, falling back to direct copy', ['mime' => $mime]);
-            if (!copy($sourcePath, $targetPath)) {
-                throw new ValidationFailedException(['proof_image' => 'فشل في حفظ ملف الإشعار']);
-            }
-            return;
+            log_message('warning', 'GD could not decode an uploaded {mime} image; rejected.', ['mime' => $mime]);
+            $reject('تعذّرت قراءة الصورة، يرجى رفع صورة بصيغة JPG أو PNG أو WebP.');
         }
 
         // Calculate aspect-ratio preserving dimensions
@@ -243,10 +252,9 @@ class ImageService
         imagedestroy($dstImg);
 
         if (!$saved) {
-            log_message('warning', 'GD save failed for mime {mime}, falling back to direct copy', ['mime' => $mime]);
-            if (!copy($sourcePath, $targetPath)) {
-                throw new ValidationFailedException(['proof_image' => 'فشل في حفظ الصورة المعالجة']);
-            }
+            log_message('error', 'GD failed to write re-encoded {mime} image; rejected.', ['mime' => $mime]);
+            @unlink($targetPath);
+            $reject('تعذّر حفظ الصورة، يرجى المحاولة مرة أخرى.');
         }
     }
 }
