@@ -143,4 +143,21 @@ final class RecentPurchasesTest extends CIUnitTestCase
         $matched = array_filter($afterBody['data'], static fn($item) => $item['product_name'] === 'Lenovo ThinkPad T480 - Core i5');
         $this->assertEmpty($matched);
     }
+
+    // CON-01: the admin page sent {enabled:true}; the API silently stored "disabled".
+    public function testTickerSettingsRequiresTickerEnabledField(): void
+    {
+        $admin = (new \App\Models\UserModel())->where('email', 'admin@wextechnology.com')->first();
+        $token = (new \App\Services\TokenService())->generateAccessToken($admin)['access_token'];
+        $h     = ['Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json'];
+
+        $this->withHeaders($h)->withBody(json_encode(['enabled' => true]))
+            ->patch('/api/v1/admin/recent-purchases/settings')->assertStatus(422);
+
+        $ok = $this->withHeaders($h)->withBody(json_encode(['ticker_enabled' => true]))
+            ->patch('/api/v1/admin/recent-purchases/settings');
+        $ok->assertStatus(200);
+        $this->assertTrue(json_decode($ok->getJSON(), true)['data']['ticker_enabled']);
+        $this->assertSame('1', (string) (new \App\Services\SettingService())->get('ticker_enabled'));
+    }
 }

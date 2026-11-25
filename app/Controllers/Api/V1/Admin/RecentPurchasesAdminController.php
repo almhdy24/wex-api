@@ -47,7 +47,11 @@ class RecentPurchasesAdminController extends BaseApiController
         $user = $this->currentUser() ?? $this->request->auth_user;
         $body = $this->request->getJSON(true) ?? $this->request->getRawInput() ?? [];
 
-        $enabled = isset($body['ticker_enabled']) ? \App\Libraries\Input::bool($body['ticker_enabled']) : false;
+        // A missing field used to mean "disable" silently (the admin page sent `enabled`).
+        if (!is_array($body) || !array_key_exists('ticker_enabled', $body)) {
+            throw new \App\Exceptions\ValidationFailedException(['ticker_enabled' => 'حقل ticker_enabled مطلوب (true أو false).']);
+        }
+        $enabled = \App\Libraries\Input::bool($body['ticker_enabled']);
 
         $this->service->updateSettings(
             enabled: $enabled,
