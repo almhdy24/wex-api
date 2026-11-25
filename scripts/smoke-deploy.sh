@@ -50,7 +50,7 @@ grep -q '"@type":"Product"' <<<"$page" && grep -q '"priceCurrency":"SDG"' <<<"$p
 grep -qE 'AED|درهم' <<<"$page" && bad "AED on product page" || ok "no AED on product page"
 expect_code "404" "$BASE/products/no-such-slug-xyz"
 xml=$(curl -sk "$BASE/sitemap.xml"); grep -q "/products/$SLUG</loc>" <<<"$xml" && ok "sitemap lists products" || bad "sitemap"
-curl -sk "$BASE/robots.txt" | grep -q 'Disallow: /admin' && ok "robots.txt" || bad "robots.txt
+curl -sk "$BASE/robots.txt" | grep -q 'Disallow: /admin' && ok "robots.txt" || bad "robots.txt"
 
 # 5. Caching and security headers
 h=$(hdr "$BASE/"); grep -qi '^cache-control: no-cache' <<<"$h" && ok "index.html no-cache" || bad "index.html cache-control"
