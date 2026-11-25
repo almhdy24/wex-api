@@ -31,7 +31,7 @@ class CorsFilter implements FilterInterface
                 $response->setHeader('Access-Control-Allow-Origin', $origin);
                 $response->setHeader('Access-Control-Allow-Credentials', 'true');
                 $response->setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-                $response->setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Request-Id, Accept, Accept-Language, X-Requested-With, Cookie');
+                $response->setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Request-Id, Accept, Accept-Language, X-Requested-With, Idempotency-Key');
                 $response->setHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-Id');
                 $response->setHeader('Access-Control-Max-Age', '86400');
                 $response->setHeader('Vary', 'Origin');
@@ -51,7 +51,7 @@ class CorsFilter implements FilterInterface
             $response->setHeader('Access-Control-Allow-Origin', $origin);
             $response->setHeader('Access-Control-Allow-Credentials', 'true');
             $response->setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            $response->setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Request-Id, Accept, Accept-Language, X-Requested-With, Cookie');
+            $response->setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Request-Id, Accept, Accept-Language, X-Requested-With, Idempotency-Key');
             $response->setHeader('Access-Control-Expose-Headers', 'Retry-After, X-Request-Id');
             $response->setHeader('Vary', 'Origin');
         }

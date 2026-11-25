@@ -192,4 +192,60 @@ final class OrderIntegrityTest extends CIUnitTestCase
         $this->assertSame('pending_payment', $details['from']);
         $this->assertSame('cancelled', $details['to']);
     }
+
+    private function postOrder(string $key)
+    {
+        return $this->withHeaders([
+            'Authorization'   => 'Bearer ' . $this->customerToken,
+            'Content-Type'    => 'application/json',
+            'Idempotency-Key' => $key,
+        ])->withBody(json_encode([
+            'order_type'    => 'pickup',
+            'contact_phone' => '0912345678',
+            'items'         => [['product_id' => $this->productId, 'quantity' => 1]],
+        ]))->post('/api/v1/orders');
+    }
+
+    // API-ORD-07: double-submitting the same checkout must create exactly one order.
+    public function testDoubleSubmitWithSameIdempotencyKeyCreatesOneOrder(): void
+    {
+        $key = 'chk_' . bin2hex(random_bytes(8));
+
+        $first = $this->postOrder($key);
+        $first->assertStatus(201);
+        $second = $this->postOrder($key);
+        $second->assertStatus(201);
+
+        $a = json_decode($first->getJSON(), true)['data']['order_number'];
+        $b = json_decode($second->getJSON(), true)['data']['order_number'];
+        $this->assertSame($a, $b);
+        $this->assertSame(4, $this->stock(), 'Stock must be reserved once');
+        $this->assertSame(1, (new OrderModel())->where('idempotency_key', $key)->countAllResults());
+    }
+
+    public function testInvalidIdempotencyKeyIsRejected(): void
+    {
+        $this->postOrder('bad key!')->assertStatus(422);
+        $this->assertSame(5, $this->stock());
+    }
+
+    // The unique index is the backstop for two simultaneous requests passing the pre-check.
+    public function testIdempotencyKeyIsUniquePerUserInDatabase(): void
+    {
+        $key = 'dup_' . bin2hex(random_bytes(8));
+        $this->postOrder($key)->assertStatus(201);
+        $existing = (new OrderModel())->where('idempotency_key', $key)->first();
+
+        $db = \Config\Database::connect();
+        $this->expectException(\Throwable::class);
+        $db->table('orders')->insert([
+            'order_number'    => 'WEX-DUP-' . bin2hex(random_bytes(3)),
+            'user_id'         => $existing->user_id,
+            'status'          => 'pending_payment',
+            'delivery_type'   => 'pickup',
+            'delivery_phone'  => '0912345678',
+            'idempotency_key' => $key,
+            'lock_expires_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+    }
 }

@@ -36,6 +36,11 @@ class OrderController extends BaseApiController
             throw new ValidationFailedException('صيغة البيانات غير صحيحة.');
         }
 
+        $headerKey = trim($this->request->getHeaderLine('Idempotency-Key'));
+        if ($headerKey !== '') {
+            $payload['idempotency_key'] = $headerKey;
+        }
+
         $orderData = $this->orderService->createOrder((int) $user->id, $payload);
         $presented = CustomerOrderPresenter::present($orderData);
 

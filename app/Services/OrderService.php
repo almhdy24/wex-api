@@ -161,6 +161,22 @@ class OrderService
             throw new ValidationFailedException('قائمة المنتجات في الطلب غير صالحة.');
         }
 
+        // Idempotency: a replay of the same checkout returns the original order.
+        $idempotencyKey = isset($data['idempotency_key']) ? trim((string) $data['idempotency_key']) : '';
+        if ($idempotencyKey !== '') {
+            if (!preg_match('/^[A-Za-z0-9_-]{8,64}$/', $idempotencyKey)) {
+                throw new ValidationFailedException('مفتاح منع التكرار غير صالح.', [
+                    'idempotency_key' => 'يجب أن يتكون المفتاح من 8 إلى 64 حرفاً أو رقماً.',
+                ]);
+            }
+            $existing = $this->findByIdempotencyKey($userId, $idempotencyKey);
+            if ($existing) {
+                return $this->getOrder($existing->order_number, $userId);
+            }
+        } else {
+            $idempotencyKey = null;
+        }
+
         // DB Transaction for atomic stock reservation and order creation
         $db = Database::connect();
         $db->transBegin();
@@ -260,6 +276,7 @@ class OrderService
                 'delivery_fee_sdg'              => $totals['delivery_fee_sdg'],
                 'total_sdg'                     => $totals['total_sdg'],
                 'lock_expires_at'               => $lockExpiresAt,
+                'idempotency_key'               => $idempotencyKey,
                 'created_at'                    => gmdate('Y-m-d H:i:s', $nowTime),
                 'updated_at'                    => gmdate('Y-m-d H:i:s', $nowTime),
             ]);
@@ -291,6 +308,14 @@ class OrderService
             $db->transCommit();
         } catch (\Throwable $e) {
             $db->transRollback();
+
+            // A concurrent request with the same key won the unique index: return its order.
+            if ($idempotencyKey !== null) {
+                $winner = $this->findByIdempotencyKey($userId, $idempotencyKey);
+                if ($winner) {
+                    return $this->getOrder($winner->order_number, $userId);
+                }
+            }
             throw $e;
         }
 
@@ -347,6 +372,14 @@ class OrderService
 
         // Return order detail structure with bank transfer instructions
         return $this->getOrder($orderNumber, $userId);
+    }
+
+    protected function findByIdempotencyKey(int $userId, string $key): ?Order
+    {
+        return $this->orders
+            ->where('user_id', $userId)
+            ->where('idempotency_key', $key)
+            ->first();
     }
 
     /**
