@@ -121,9 +121,10 @@ class AuthController extends BaseApiController
         $userAgent = $this->request->getUserAgent()->getAgentString();
         $ip = $this->request->getIPAddress();
         $tokenService = new \App\Services\TokenService();
-        $tokens = $tokenService->issueTokenPair($user, $userAgent, $ip);
+        $access       = $tokenService->generateAccessToken($user);
+        $refreshToken = $tokenService->generateRefreshToken((int) $user->id, null, $userAgent, $ip);
 
-        $this->setRefreshTokenCookie($tokens['refresh_token'], (int) ($tokens['refresh_expires_in'] ?? 30 * 86400));
+        $this->setRefreshTokenCookie($refreshToken, 30 * 86400);
 
         $data = [
             'user'         => [
@@ -133,10 +134,10 @@ class AuthController extends BaseApiController
                 'phone'    => $user->phone,
                 'role'     => $user->role,
             ],
-            'access_token' => $tokens['access_token'],
-            'refresh_token'=> $tokens['refresh_token'],
+            'access_token' => $access['access_token'],
+            'refresh_token'=> $refreshToken,
             'token_type'   => 'Bearer',
-            'expires_in'   => $tokens['access_expires_in'] ?? 900,
+            'expires_in'   => $access['expires_in'] ?? 900,
         ];
 
         return $this->respondSuccess($data, 'تم تسجيل الدخول بنجاح لبيئة الاختبار');
