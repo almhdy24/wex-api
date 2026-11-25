@@ -148,11 +148,9 @@ class PaymentProofService
             }
 
             if (!$isReplacement) {
-                // Transition order status to payment_review
-                $this->orders->update($order->id, [
-                    'status'     => Wex::ORDER_STATUS_PAYMENT_REVIEW,
-                    'updated_at' => $nowStr,
-                ]);
+                // Transition order status to payment_review (compare-and-set: the order may have
+                // been cancelled/expired concurrently and must not be resurrected).
+                $this->orderService->casStatus($order, Wex::ORDER_STATUS_PENDING_PAYMENT, Wex::ORDER_STATUS_PAYMENT_REVIEW, $nowStr);
             }
 
             // Add structured timeline event
@@ -353,7 +351,14 @@ class PaymentProofService
         }
 
         if ($proof->status !== Wex::PROOF_STATUS_PENDING) {
-            throw new ConflictException('تمت مراجعة هذا الإشعار مسبقاً بحالة: ' . $proof->status);
+            throw new ConflictException('تمت مراجعة هذا الإشعار مسبقاً.');
+        }
+
+        // A proof can only be reviewed while its order is awaiting review. Without this an
+        // admin could "approve" a proof on an order that was already cancelled/expired (stock
+        // released), resurrecting it as confirmed and overselling.
+        if ($order->status !== Wex::ORDER_STATUS_PAYMENT_REVIEW) {
+            throw new ConflictException('لا يمكن مراجعة الإشعار لأن الطلب ليس في مرحلة مراجعة الدفع.');
         }
 
         $nowStr = gmdate('Y-m-d H:i:s');
@@ -363,20 +368,23 @@ class PaymentProofService
         $db->transBegin();
 
         try {
-            if ($action === 'approve') {
-                // Update proof
-                $this->paymentProofs->update($proof->id, [
-                    'status'      => Wex::PROOF_STATUS_APPROVED,
+            // Compare-and-set the proof: two reviewers acting at once must not both win.
+            $this->paymentProofs->builder()
+                ->where('id', $proof->id)
+                ->where('status', Wex::PROOF_STATUS_PENDING)
+                ->update([
+                    'status'      => $action === 'approve' ? Wex::PROOF_STATUS_APPROVED : Wex::PROOF_STATUS_REJECTED,
                     'review_note' => $reviewNote,
                     'reviewed_by' => $reviewerUserId,
                     'reviewed_at' => $nowStr,
                 ]);
+            if ($db->affectedRows() !== 1) {
+                throw new ConflictException('تمت مراجعة هذا الإشعار مسبقاً.');
+            }
 
-                // Transition order to confirmed
-                $this->orders->update($order->id, [
-                    'status'     => Wex::ORDER_STATUS_CONFIRMED,
-                    'updated_at' => $nowStr,
-                ]);
+            if ($action === 'approve') {
+                // Transition order to confirmed (compare-and-set on payment_review)
+                $this->orderService->casStatus($order, Wex::ORDER_STATUS_PAYMENT_REVIEW, Wex::ORDER_STATUS_CONFIRMED, $nowStr);
 
                 // Add event
                 $eventNote = 'تمت مراجعة التحويل البنكي والموافقة عليه وتأكيد الطلب.';
@@ -400,14 +408,7 @@ class PaymentProofService
                     'created_at'    => $nowStr,
                 ]));
             } else {
-                // Reject
-                $this->paymentProofs->update($proof->id, [
-                    'status'      => Wex::PROOF_STATUS_REJECTED,
-                    'review_note' => $reviewNote,
-                    'reviewed_by' => $reviewerUserId,
-                    'reviewed_at' => $nowStr,
-                ]);
-
+                // Reject (proof already marked rejected above)
                 // Check lock expiry
                 $nowTime = time();
                 $lockExpiresTime = strtotime($order->lock_expires_at);
@@ -418,10 +419,7 @@ class PaymentProofService
 
                 if ($nowTime <= $lockExpiresTime) {
                     // Lock still valid: return to pending_payment for re-upload
-                    $this->orders->update($order->id, [
-                        'status'     => Wex::ORDER_STATUS_PENDING_PAYMENT,
-                        'updated_at' => $nowStr,
-                    ]);
+                    $this->orderService->casStatus($order, Wex::ORDER_STATUS_PAYMENT_REVIEW, Wex::ORDER_STATUS_PENDING_PAYMENT, $nowStr);
 
                     $eventNote = 'تم رفض إشعار التحويل البنكي. يرجى رفع إشعار تحويل صحيح قبل انتهاء فترة حجز السعر.';
                     if ($reviewNote) {
@@ -440,19 +438,10 @@ class PaymentProofService
                     ]));
                 } else {
                     // Lock expired: transition to expired and restore stock
-                    $this->orders->update($order->id, [
-                        'status'     => Wex::ORDER_STATUS_EXPIRED,
-                        'updated_at' => $nowStr,
-                    ]);
+                    $this->orderService->casStatus($order, Wex::ORDER_STATUS_PAYMENT_REVIEW, Wex::ORDER_STATUS_EXPIRED, $nowStr);
 
                     // Restore reserved stock
-                    $orderItems = (new \App\Models\OrderItemModel())->where('order_id', $order->id)->findAll();
-                    foreach ($orderItems as $item) {
-                        $db->query(
-                            'UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?',
-                            [$item->quantity, $nowStr, $item->product_id]
-                        );
-                    }
+                    $this->orderService->restoreStock((int) $order->id);
 
                     $eventNote = 'تم رفض إشعار التحويل البنكي، ونظراً لانتهاء فترة حجز السعر فقد تم إلغاء الطلب وإعادة المنتجات إلى المخزون.';
                     if ($reviewNote) {
@@ -476,6 +465,16 @@ class PaymentProofService
         } catch (\Throwable $e) {
             $db->transRollback();
             throw $e;
+        }
+
+        try {
+            (new AuditLogService())->log($reviewerUserId, 'payment_proof_' . ($action === 'approve' ? 'approved' : 'rejected'), 'order', (int) $order->id, [
+                'order_number' => $orderNumber,
+                'proof_id'     => (int) $proof->id,
+                'note'         => $reviewNote,
+            ]);
+        } catch (\Throwable $e) {
+            log_message('error', 'Audit log write failed for proof review: {msg}', ['msg' => $e->getMessage()]);
         }
 
         // Send review notification
