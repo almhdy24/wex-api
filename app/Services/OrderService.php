@@ -369,31 +369,41 @@ class OrderService
             return false;
         }
 
-        // Atomically update status in DB
+        // Atomically update status, restore stock and log the event in ONE transaction:
+        // a failure half-way must not leave an expired order whose stock was never released.
         $db = Database::connect();
         $nowStr = gmdate('Y-m-d H:i:s', $now);
 
-        $db->query(
-            "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = ?",
-            [Wex::ORDER_STATUS_EXPIRED, $nowStr, $order->id, Wex::ORDER_STATUS_PENDING_PAYMENT]
-        );
+        $db->transBegin();
+        try {
+            $db->query(
+                "UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = ?",
+                [Wex::ORDER_STATUS_EXPIRED, $nowStr, $order->id, Wex::ORDER_STATUS_PENDING_PAYMENT]
+            );
+            $expired = $db->affectedRows() === 1;
 
-        if ($db->affectedRows() === 1) {
-            // Restore reserved stock
-            $this->restoreStockForOrder((int) $order->id);
+            if ($expired) {
+                $this->restoreStockForOrder((int) $order->id);
 
-            // Add timeline event
-            $this->orderEvents->insert(new OrderEvent([
-                'order_id'      => $order->id,
-                'from_status'   => Wex::ORDER_STATUS_PENDING_PAYMENT,
-                'to_status'     => Wex::ORDER_STATUS_EXPIRED,
-                'actor_user_id' => null, // system
-                'event_type'    => 'order_expired',
-                'meta'          => json_encode(['reason' => 'lock_expired']),
-                'note'          => 'انتهت فترة حجز السعر المحددة للطلب وتم إلغاء الحجز وإعادة المنتجات إلى المخزون.',
-                'created_at'    => $nowStr,
-            ]));
+                $this->orderEvents->insert(new OrderEvent([
+                    'order_id'      => $order->id,
+                    'from_status'   => Wex::ORDER_STATUS_PENDING_PAYMENT,
+                    'to_status'     => Wex::ORDER_STATUS_EXPIRED,
+                    'actor_user_id' => null, // system
+                    'event_type'    => 'order_expired',
+                    'meta'          => json_encode(['reason' => 'lock_expired']),
+                    'note'          => 'انتهت فترة حجز السعر المحددة للطلب وتم إلغاء الحجز وإعادة المنتجات إلى المخزون.',
+                    'created_at'    => $nowStr,
+                ]));
+            }
 
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
+
+        if ($expired) {
             $order->status = Wex::ORDER_STATUS_EXPIRED;
             $order->updated_at = $nowStr;
 
@@ -956,8 +966,12 @@ class OrderService
             throw new NotFoundException('الطلب غير موجود.');
         }
 
+        // Lazy expiry first so an admin never acts on a stale pending order.
+        $this->refreshExpiry($order);
+
         $fromStatus = $order->status;
         OrderStateMachine::assertCanTransition($fromStatus, $newStatus);
+        OrderStateMachine::assertMatchesDeliveryType((string) $order->delivery_type, $newStatus);
 
         $nowStr = gmdate('Y-m-d H:i:s');
         $db = Database::connect();
@@ -982,7 +996,17 @@ class OrderService
                 $updateData['cancelled_reason'] = trim((string) $extra['cancelled_reason']);
             }
 
-            $this->orders->update($order->id, $updateData);
+            // Compare-and-set on the status we validated: concurrent transitions (two admins,
+            // admin vs customer cancel, expiry worker) must not both succeed, or stock would be
+            // restored twice.
+            $this->orders->builder()
+                ->where('id', $order->id)
+                ->where('status', $fromStatus)
+                ->update($updateData);
+
+            if ($db->affectedRows() !== 1) {
+                throw new ConflictException('تغيرت حالة الطلب أثناء المعالجة، يرجى تحديث الصفحة والمحاولة مجدداً.');
+            }
 
             // Restore stock if needed
             if (OrderStateMachine::shouldRestoreStock($fromStatus, $newStatus)) {
@@ -1011,6 +1035,13 @@ class OrderService
             $db->transRollback();
             throw $e;
         }
+
+        $this->audit($actorUserId, 'order_status_changed', (int) $order->id, [
+            'order_number' => $orderNumber,
+            'from'         => $fromStatus,
+            'to'           => $newStatus,
+            'note'         => $note,
+        ]);
 
         // Send status change notification
         try {
@@ -1114,6 +1145,8 @@ class OrderService
             throw new NotFoundException('الطلب غير موجود.');
         }
 
+        $this->refreshExpiry($order);
+
         if (!in_array($order->status, [Wex::ORDER_STATUS_PENDING_PAYMENT, Wex::ORDER_STATUS_PAYMENT_REVIEW], true)) {
             throw new ConflictException('يمكن تمديد حجز السعر فقط للطلبات التي في مرحلة الدفع أو المراجعة.');
         }
@@ -1123,9 +1156,22 @@ class OrderService
         $baseTime = max(time(), $currentExpiry);
         $newExpiry = gmdate('Y-m-d H:i:s', $baseTime + ($extraHours * 3600));
 
-        $this->orders->update($order->id, [
-            'lock_expires_at' => $newExpiry,
-            'updated_at'      => gmdate('Y-m-d H:i:s'),
+        $this->orders->builder()
+            ->where('id', $order->id)
+            ->where('status', $order->status)
+            ->update([
+                'lock_expires_at' => $newExpiry,
+                'updated_at'      => gmdate('Y-m-d H:i:s'),
+            ]);
+        if ($this->orders->db->affectedRows() !== 1) {
+            throw new ConflictException('تغيرت حالة الطلب أثناء المعالجة، يرجى تحديث الصفحة والمحاولة مجدداً.');
+        }
+
+        $this->audit($actorUserId, 'order_lock_extended', (int) $order->id, [
+            'order_number' => $orderNumber,
+            'from'         => $order->lock_expires_at,
+            'to'           => $newExpiry,
+            'extra_hours'  => $extraHours,
         ]);
 
         $eventMeta = [
@@ -1177,10 +1223,7 @@ class OrderService
         try {
             if ($expiresAt > $now) {
                 $newStatus = Wex::ORDER_STATUS_PENDING_PAYMENT;
-                $this->orders->update($order->id, [
-                    'status'     => $newStatus,
-                    'updated_at' => $nowStr,
-                ]);
+                $this->casStatus($order, Wex::ORDER_STATUS_PAYMENT_REVIEW, $newStatus, $nowStr);
 
                 $this->orderEvents->insert(new OrderEvent([
                     'order_id'      => $order->id,
@@ -1194,10 +1237,7 @@ class OrderService
                 ]));
             } else {
                 $newStatus = Wex::ORDER_STATUS_EXPIRED;
-                $this->orders->update($order->id, [
-                    'status'     => $newStatus,
-                    'updated_at' => $nowStr,
-                ]);
+                $this->casStatus($order, Wex::ORDER_STATUS_PAYMENT_REVIEW, $newStatus, $nowStr);
 
                 $this->restoreStockForOrder((int) $order->id);
 
@@ -1219,7 +1259,51 @@ class OrderService
             throw $e;
         }
 
+        $this->audit($actorUserId, 'order_orphan_reset', (int) $order->id, [
+            'order_number' => $orderNumber,
+            'from'         => Wex::ORDER_STATUS_PAYMENT_REVIEW,
+            'to'           => $newStatus,
+        ]);
+
         return $this->getOrder($orderNumber, null, true);
+    }
+
+    /**
+     * Compare-and-set an order status. Throws ConflictException when another request
+     * already moved the order away from $expectedStatus.
+     *
+     * @throws ConflictException
+     */
+    public function casStatus(Order $order, string $expectedStatus, string $newStatus, string $nowStr): void
+    {
+        $this->orders->builder()
+            ->where('id', $order->id)
+            ->where('status', $expectedStatus)
+            ->update(['status' => $newStatus, 'updated_at' => $nowStr]);
+
+        if ($this->orders->db->affectedRows() !== 1) {
+            throw new ConflictException('تغيرت حالة الطلب أثناء المعالجة، يرجى تحديث الصفحة والمحاولة مجدداً.');
+        }
+    }
+
+    /**
+     * Writes an admin audit entry; never lets an audit failure break the business action.
+     */
+    protected function audit(?int $actorUserId, string $action, int $entityId, array $details): void
+    {
+        try {
+            (new AuditLogService())->log($actorUserId, $action, 'order', $entityId, $details);
+        } catch (\Throwable $e) {
+            log_message('error', 'Audit log write failed for {action}: {msg}', ['action' => $action, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Restores reserved stock for an order (public for PaymentProofService).
+     */
+    public function restoreStock(int $orderId): void
+    {
+        $this->restoreStockForOrder($orderId);
     }
 
     /**
