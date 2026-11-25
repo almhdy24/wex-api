@@ -61,6 +61,7 @@ class ProductAdminController extends BaseApiController
     {
         $body = $this->getJsonBody();
         $product = $this->productService->createProduct($body);
+        $this->audit('product_created', (int) $product->id, ['after' => $product->toArray()]);
 
         return $this->respondCreated(AdminProductPresenter::present($product), lang('Api.product_created'));
     }
@@ -83,8 +84,10 @@ class ProductAdminController extends BaseApiController
      */
     public function update(int $id): ResponseInterface
     {
-        $body = $this->getJsonBody();
+        $body   = $this->getJsonBody();
+        $before = $this->productModel->find($id);
         $product = $this->productService->updateProduct($id, $body);
+        $this->audit('product_updated', $id, $this->diff($before ? $before->toArray() : [], $product->toArray()));
 
         return $this->respondSuccess(AdminProductPresenter::present($product), lang('Api.product_updated'));
     }
@@ -95,6 +98,7 @@ class ProductAdminController extends BaseApiController
     public function delete(int $id): ResponseInterface
     {
         $this->productService->deleteProduct($id);
+        $this->audit('product_deleted', $id, []);
 
         return $this->respondSuccess(null, lang('Api.product_deleted'));
     }
@@ -110,7 +114,12 @@ class ProductAdminController extends BaseApiController
             throw new ValidationFailedException(['stock_quantity' => 'الكمية مطلوبة ويجب أن تكون رقماً']);
         }
 
+        $before  = $this->productModel->find($id);
         $product = $this->productService->updateStock($id, (int) $body['stock_quantity']);
+        $this->audit('product_stock_updated', $id, [
+            'from' => $before ? (int) $before->stock_quantity : null,
+            'to'   => (int) $product->stock_quantity,
+        ]);
 
         return $this->respondSuccess(AdminProductPresenter::present($product), 'تم تحديث كمية المخزون بنجاح');
     }
@@ -127,6 +136,7 @@ class ProductAdminController extends BaseApiController
         }
 
         $this->productService->linkAccessory($id, (int) $body['accessory_id']);
+        $this->audit('product_accessory_linked', $id, ['accessory_id' => (int) $body['accessory_id']]);
 
         return $this->respondSuccess(null, 'تم ربط الإكسسوار بالجهاز بنجاح');
     }
@@ -137,7 +147,47 @@ class ProductAdminController extends BaseApiController
     public function unlinkAccessory(int $id, int $accessoryId): ResponseInterface
     {
         $this->productService->unlinkAccessory($id, $accessoryId);
+        $this->audit('product_accessory_unlinked', $id, ['accessory_id' => $accessoryId]);
 
         return $this->respondSuccess(null, 'تم فك ارتباط الإكسسوار بنجاح');
+    }
+
+    /**
+     * @param array<string, mixed> $details
+     */
+    private function audit(string $action, int $productId, array $details): void
+    {
+        try {
+            $user = $this->currentUser();
+            (new \App\Services\AuditLogService())->log(
+                $user ? (int) $user->id : null,
+                $action,
+                'product',
+                $productId,
+                $details,
+                $this->request->getIPAddress()
+            );
+        } catch (\Throwable $e) {
+            log_message('error', 'Audit log write failed for {action}: {msg}', ['action' => $action, 'msg' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * @return array{changes: array<string, array{from: mixed, to: mixed}>}
+     */
+    private function diff(array $before, array $after): array
+    {
+        $changes = [];
+        foreach ($after as $key => $value) {
+            if ($key === 'updated_at') {
+                continue;
+            }
+            $old = $before[$key] ?? null;
+            if ((string) json_encode($old) !== (string) json_encode($value)) {
+                $changes[$key] = ['from' => $old, 'to' => $value];
+            }
+        }
+
+        return ['changes' => $changes];
     }
 }

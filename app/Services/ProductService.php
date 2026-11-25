@@ -401,6 +401,8 @@ class ProductService
             throw new NotFoundException(lang('Api.product_not_found'));
         }
 
+        $this->validateProductData($data, true);
+
         $updateFields = [];
 
         if (isset($data['name'])) {
@@ -417,9 +419,19 @@ class ProductService
             'is_active', 'is_featured',
         ];
 
+        $intKeys  = ['category_id', 'price_aed', 'stock_quantity'];
+        $boolKeys = ['is_active', 'is_featured'];
         foreach ($allowedKeys as $key) {
             if (array_key_exists($key, $data)) {
-                $updateFields[$key] = $data[$key];
+                $value = $data[$key];
+                if (in_array($key, $intKeys, true)) {
+                    $value = (int) $value;
+                } elseif (in_array($key, $boolKeys, true)) {
+                    $value = (int) filter_var($value, FILTER_VALIDATE_BOOLEAN);
+                } elseif ($key === 'brand_id') {
+                    $value = !empty($value) ? (int) $value : null;
+                }
+                $updateFields[$key] = $value;
             }
         }
 
@@ -509,23 +521,42 @@ class ProductService
             ->delete();
     }
 
-    protected function validateProductData(array $data): void
+    /**
+     * Validates product input. With $partial=true (PATCH) only the keys present are checked,
+     * but every present key is checked: an update must not be able to set a zero/negative
+     * price, negative stock, an unknown type/condition or a non-existent category/brand.
+     */
+    protected function validateProductData(array $data, bool $partial = false): void
     {
         $errors = [];
-        if (empty($data['name'])) {
+        $has = static fn (string $k): bool => !$partial || array_key_exists($k, $data);
+
+        if ($has('name') && trim((string) ($data['name'] ?? '')) === '') {
             $errors['name'] = 'اسم الجهاز مطلوب';
+        } elseif ($has('name') && mb_strlen(trim((string) $data['name'])) > 191) {
+            $errors['name'] = 'اسم الجهاز طويل جداً';
         }
-        if (empty($data['type']) || !in_array($data['type'], Wex::PRODUCT_TYPES, true)) {
+        if ($has('type') && (empty($data['type']) || !in_array($data['type'], Wex::PRODUCT_TYPES, true))) {
             $errors['type'] = 'نوع المنتج غير صالح (laptop, phone, accessory)';
         }
-        if (empty($data['condition']) || !in_array($data['condition'], Wex::CONDITIONS, true)) {
+        if ($has('condition') && (empty($data['condition']) || !in_array($data['condition'], Wex::CONDITIONS, true))) {
             $errors['condition'] = 'حالة المنتج غير صالحة (new, used_imported)';
         }
-        if (!isset($data['price_aed']) || !is_numeric($data['price_aed']) || (int) $data['price_aed'] < 1) {
+        if ($has('price_aed') && (!isset($data['price_aed']) || filter_var($data['price_aed'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 10000000]]) === false)) {
             $errors['price_aed'] = 'سعر الدرهم مطلوب ويجب أن يكون رقماً صحيحاً أكبر من صفر';
         }
-        if (empty($data['category_id']) || !is_numeric($data['category_id'])) {
-            $errors['category_id'] = 'فئة المنتج مطلوبة';
+        if (array_key_exists('stock_quantity', $data) && filter_var($data['stock_quantity'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100000]]) === false) {
+            $errors['stock_quantity'] = 'الكمية يجب أن تكون رقماً صحيحاً بين 0 و 100000';
+        }
+        if ($has('category_id')) {
+            if (empty($data['category_id']) || !is_numeric($data['category_id'])) {
+                $errors['category_id'] = 'فئة المنتج مطلوبة';
+            } elseif (!$this->categoryModel->find((int) $data['category_id'])) {
+                $errors['category_id'] = 'الفئة المحددة غير موجودة';
+            }
+        }
+        if (!empty($data['brand_id']) && (!is_numeric($data['brand_id']) || !$this->brandModel->find((int) $data['brand_id']))) {
+            $errors['brand_id'] = 'العلامة التجارية المحددة غير موجودة';
         }
 
         if (!empty($errors)) {
