@@ -44,6 +44,11 @@ class WebPushProvider implements PushProviderInterface
             return PushResult::expired('Missing WebPush subscription endpoint or keys.', 400);
         }
 
+        // Defence in depth for rows stored before the endpoint policy existed (SSRF).
+        if (!\App\Libraries\PushEndpointPolicy::isAllowed((string) $subscription->endpoint_or_token)) {
+            return PushResult::expired('WebPush endpoint host is not an allowed push service.', 400);
+        }
+
         try {
             $webPush = new WebPush([
                 'VAPID' => [

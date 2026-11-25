@@ -61,7 +61,8 @@ class PushController extends BaseApiController
             $sub = $body['subscription'] ?? $body;
             $endpointOrToken = trim((string) ($sub['endpoint'] ?? ($body['endpoint_or_token'] ?? '')));
             $keys = is_array($sub['keys'] ?? null) ? $sub['keys'] : [];
-            if ($endpointOrToken === '' || !filter_var($endpointOrToken, FILTER_VALIDATE_URL)) {
+            if ($endpointOrToken === '' || !filter_var($endpointOrToken, FILTER_VALIDATE_URL)
+                || !\App\Libraries\PushEndpointPolicy::isAllowed($endpointOrToken)) {
                 $errors['subscription'] = 'بيانات اشتراك المتصفح غير صالحة.';
             }
             if (empty($keys['p256dh']) || empty($keys['auth'])) {

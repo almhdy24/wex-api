@@ -92,6 +92,19 @@ final class PushNotificationTest extends CIUnitTestCase
             'subscription' => ['endpoint' => 'not-a-url', 'keys' => []],
         ]);
         $bad->assertStatus(422);
+
+        // API-PUSH-01: SSRF target with valid-looking keys must be rejected.
+        $ssrf = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->customerToken,
+        ])->withBodyFormat('json')->post('/api/v1/push/subscriptions', [
+            'platform'     => 'web',
+            'provider'     => 'webpush',
+            'subscription' => [
+                'endpoint' => 'http://169.254.169.254/latest/meta-data/',
+                'keys'     => ['p256dh' => 'BAAAAAAAAAAAAAAAAAAAAAAAAAAA', 'auth' => 'AAAAAAAAAAAAAAAA'],
+            ],
+        ]);
+        $ssrf->assertStatus(422);
     }
 
     public function testUserRebindingOnSameEndpointAndUnsubscribe(): void
