@@ -101,6 +101,48 @@ class AuthController extends BaseApiController
     }
 
     /**
+     * POST /api/v1/auth/testing-login
+     * Strictly guarded by testing environment. Never executes in production.
+     */
+    public function testingLogin(): ResponseInterface
+    {
+        $env = getenv('CI_ENVIRONMENT') ?: (defined('ENVIRONMENT') ? ENVIRONMENT : 'development');
+        if (strtolower($env) !== 'testing') {
+            return $this->respondError('غير متاح في هذه البيئة', 404);
+        }
+
+        $body = $this->getJsonBody();
+        $email = !empty($body['email']) ? (string) $body['email'] : 'customer@wex.sd';
+        $user = (new \App\Models\UserModel())->where('email', $email)->first();
+        if (!$user) {
+            return $this->respondError('المستخدم غير موجود', 404);
+        }
+
+        $userAgent = $this->request->getUserAgent()->getAgentString();
+        $ip = $this->request->getIPAddress();
+        $tokenService = new \App\Services\TokenService();
+        $tokens = $tokenService->issueTokenPair($user, $userAgent, $ip);
+
+        $this->setRefreshTokenCookie($tokens['refresh_token'], (int) ($tokens['refresh_expires_in'] ?? 30 * 86400));
+
+        $data = [
+            'user'         => [
+                'id'       => (int) $user->id,
+                'name'     => $user->name,
+                'email'    => $user->email,
+                'phone'    => $user->phone,
+                'role'     => $user->role,
+            ],
+            'access_token' => $tokens['access_token'],
+            'refresh_token'=> $tokens['refresh_token'],
+            'token_type'   => 'Bearer',
+            'expires_in'   => $tokens['access_expires_in'] ?? 900,
+        ];
+
+        return $this->respondSuccess($data, 'تم تسجيل الدخول بنجاح لبيئة الاختبار');
+    }
+
+    /**
      * POST /api/v1/auth/refresh
      */
     public function refresh(): ResponseInterface

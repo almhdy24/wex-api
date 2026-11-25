@@ -30,9 +30,13 @@ class ShippingZoneController extends BaseApiController
             ->findAll();
 
         $data = array_map(static fn($z) => [
-            'id'            => (int) $z->id,
-            'state_name_ar' => $z->state_name_ar,
-            'fee_sdg'       => (int) $z->fee_sdg,
+            'id'               => (int) $z->id,
+            'name'             => (string) $z->state_name_ar,
+            'zone_name'        => (string) $z->state_name_ar,
+            'state_name_ar'    => (string) $z->state_name_ar,
+            'fee_sdg'          => (int) $z->fee_sdg,
+            'delivery_fee_sdg' => (int) $z->fee_sdg,
+            'is_active'        => (bool) ($z->is_active ?? 1),
         ], $zones);
 
         return $this->respondSuccess($data, 'مناطق التوصيل ورسوم الشحن');

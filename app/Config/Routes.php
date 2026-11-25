@@ -16,6 +16,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->post('google', 'AuthController::google', ['filter' => 'throttle:30,60,google_auth']);
         $routes->post('email/request', 'AuthController::requestEmailOtp', ['filter' => 'throttle:10,3600,otp_req']);
         $routes->post('email/verify', 'AuthController::verifyEmailOtp', ['filter' => 'throttle:10,600,otp_ver']);
+        $routes->post('testing-login', 'AuthController::testingLogin');
         $routes->post('refresh', 'AuthController::refresh');
         $routes->post('logout', 'AuthController::logout');
         $routes->post('logout-all', 'AuthController::logoutAll', ['filter' => 'auth']);
