@@ -61,12 +61,15 @@ class GoogleAuthService
                 throw new ValidationFailedException(['id_token' => lang('Api.google_auth_failed')]);
             }
 
-            // 2. Verify Audience (if GOOGLE_CLIENT_IDS configured)
-            if (!empty($this->allowedAudiences)) {
-                $aud = $payload->aud ?? '';
-                if (!in_array($aud, $this->allowedAudiences, true)) {
-                    throw new ValidationFailedException(['id_token' => lang('Api.google_auth_failed')]);
-                }
+            // 2. Verify Audience. Fail closed: with no configured client IDs, a token minted
+            //    for ANY third-party Google app would otherwise be accepted (token substitution).
+            if (empty($this->allowedAudiences)) {
+                log_message('error', 'GOOGLE_CLIENT_IDS is not configured; rejecting Google sign-in.');
+                throw new ValidationFailedException(['id_token' => lang('Api.google_auth_failed')]);
+            }
+            $aud = $payload->aud ?? '';
+            if (!is_string($aud) || !in_array($aud, $this->allowedAudiences, true)) {
+                throw new ValidationFailedException(['id_token' => lang('Api.google_auth_failed')]);
             }
 
             // 3. Verify Expiration
