@@ -26,6 +26,20 @@ Run tests ONE file at a time: `php vendor/bin/phpunit -c phpunit.dist.xml tests/
 - API-PRD-02 | Medium | product mutations unaudited | Fixed | see log | ProductAdminHardeningTest
 - WEB-CHK-01 | High | checkout sent notes, API reads customer_notes (contract) | Fixed | wex-web | checkout-idempotency.test.js
 - WEB-CHK-02 | Medium | checkout no idempotency key | Fixed | wex-web | checkout-idempotency.test.js
+- API-INP-01 | Low | (bool)'false' === true in 20 admin write paths | Fixed | Input::bool | InputTest, AdminTest
+- API-TAX-01/02/03 | Medium | category delete-in-use 500, dup slug 500, unaudited | Fixed | TaxonomyAdminTest
+- API-INT-01 | High | integrity repair double stock restore race | Fixed | IntegrityRepairRaceTest
+- API-PUSH-02 | Medium | push outbox double send | Fixed | PushOutboxClaimTest
+- API-MAIL-01 | Medium | mail outbox double send | Fixed | MailOutboxClaimTest
+- CON-01 | High | admin ticker toggle sent `enabled`, API reads ticker_enabled (always disabled) | Fixed both sides | contract-check + RecentPurchasesTest
+- CORS-01 | Medium | Date not exposed cross-origin (clock offset 0) | Fixed | PingTest
+- WEB-API-01 | High | api.put undefined (push prefs, admin push settings, image reorder crash) | Fixed | api-put.test.js
+- WEB-API-02 | Low | offline refresh failure shown as session expired | Fixed | api-put.test.js
+- WEB-AUTH-01 | High | previous account's cached orders shown after logout/login | Fixed | auth-cache-isolation.test.jsx
+- WEB-SEC-01 | Medium | returnTo open redirect (GuestRoute unvalidated, backslash) | Fixed | open-redirect.test.jsx
+- WEB-SEC-02 | Low | push deep link '/\\evil' cross-origin | Fixed | open-redirect.test.jsx
+- WEB-TIME-01 | High | SW-cached Date header skewed price-lock countdown by hours | Fixed | server-clock.test.js
+- TOOL: wex-web scripts/contract-check.js in check:all (routes, methods, request fields; NOT response fields)
 - CI: API phpunit workflow added (run 45610592681 green); wex-web e2e sets TESTING_LOGIN_ENABLED; ui-check PHP 8.3
 - NOTE: delete writable/database/test.sqlite before every fail-before check (persistent test DB pollutes results)
 
