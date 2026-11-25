@@ -249,4 +249,27 @@ final class OrderIntegrityTest extends CIUnitTestCase
             'lock_expires_at' => gmdate('Y-m-d H:i:s'),
         ]);
     }
+
+    // VIS-05: the admin order detail must carry SDG item amounts that add up (the page
+    // renders unit_price_sdg / line_total_sdg / subtotal_sdg directly).
+    public function testAdminOrderDetailItemsHaveConsistentSdgAmounts(): void
+    {
+        $orderNumber = $this->createOrder('delivery');
+
+        $res = $this->withHeaders(['Authorization' => 'Bearer ' . $this->adminToken])
+            ->get("/api/v1/admin/orders/{$orderNumber}");
+        $res->assertStatus(200);
+        $o = json_decode($res->getJSON(), true)['data'];
+
+        $this->assertNotEmpty($o['items']);
+        $sum = 0;
+        foreach ($o['items'] as $it) {
+            $this->assertGreaterThan(0, $it['unit_price_sdg']);
+            $this->assertSame($it['unit_price_sdg'] * $it['quantity'], $it['line_total_sdg']);
+            $sum += $it['line_total_sdg'];
+        }
+        $this->assertSame($sum, $o['subtotal_sdg']);
+        $this->assertGreaterThan(0, $o['delivery_fee_sdg']);
+        $this->assertGreaterThanOrEqual($o['subtotal_sdg'] - $o['discount_sdg'] + $o['delivery_fee_sdg'], $o['total_sdg']);
+    }
 }
