@@ -276,60 +276,23 @@ class IntegrityService
         $nowStr = gmdate('Y-m-d H:i:s');
         $now = time();
 
-        // Safe Repair 1: Orphan payment_review orders
+        // Safe Repair 1: Orphan payment_review orders.
+        // Every write is compare-and-set inside a transaction: a concurrent upload, review,
+        // admin action or lazy expiry must not be overwritten or double-restore stock.
         foreach ($report['violations']['payment_review_without_pending_proof'] as $orphan) {
             $order = $this->orders->find($orphan['order_id']);
             if (!$order) {
                 continue;
             }
 
-            $expiresAt = strtotime($order->lock_expires_at);
-            if ($expiresAt > $now) {
-                $targetStatus = Wex::ORDER_STATUS_PENDING_PAYMENT;
-                $actionDesc = "إعادة الطلب {$order->order_number} إلى انتظار التحويل (pending_payment) لسريان مهلة الحجز";
-                if (!$dryRun) {
-                    $this->orders->update($order->id, [
-                        'status'     => $targetStatus,
-                        'updated_at' => $nowStr,
-                    ]);
-                    $this->orderEvents->insert(new OrderEvent([
-                        'order_id'      => $order->id,
-                        'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
-                        'to_status'     => $targetStatus,
-                        'actor_user_id' => null,
-                        'event_type'    => 'orphan_order_reset',
-                        'meta'          => json_encode(['repaired_by' => 'integrity_repair']),
-                        'note'          => 'إعادة الطلب إلى بانتظار التحويل لعدم وجود إشعار مرفوع',
-                        'created_at'    => $nowStr,
-                    ]));
-                }
-            } else {
-                $targetStatus = Wex::ORDER_STATUS_EXPIRED;
-                $actionDesc = "إلغاء الطلب {$order->order_number} (expired) لانتهاء مهلة الحجز واستعادة المخزون";
-                if (!$dryRun) {
-                    $this->orders->update($order->id, [
-                        'status'     => $targetStatus,
-                        'updated_at' => $nowStr,
-                    ]);
-                    // Restore stock
-                    $orderItems = $this->orderItems->where('order_id', $order->id)->findAll();
-                    foreach ($orderItems as $item) {
-                        $db->query(
-                            'UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?',
-                            [$item->quantity, $nowStr, $item->product_id]
-                        );
-                    }
-                    $this->orderEvents->insert(new OrderEvent([
-                        'order_id'      => $order->id,
-                        'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
-                        'to_status'     => $targetStatus,
-                        'actor_user_id' => null,
-                        'event_type'    => 'orphan_order_expired',
-                        'meta'          => json_encode(['repaired_by' => 'integrity_repair']),
-                        'note'          => 'إلغاء الطلب لانتهاء مهلة حجز السعر بدون إشعار دفع',
-                        'created_at'    => $nowStr,
-                    ]));
-                }
+            $expired      = strtotime($order->lock_expires_at) <= $now;
+            $targetStatus = $expired ? Wex::ORDER_STATUS_EXPIRED : Wex::ORDER_STATUS_PENDING_PAYMENT;
+            $actionDesc   = $expired
+                ? "إلغاء الطلب {$order->order_number} (expired) لانتهاء مهلة الحجز واستعادة المخزون"
+                : "إعادة الطلب {$order->order_number} إلى انتظار التحويل (pending_payment) لسريان مهلة الحجز";
+
+            if (!$dryRun && !$this->repairOrphanOrder($order, $targetStatus, $nowStr)) {
+                continue; // state changed concurrently; nothing to repair any more
             }
 
             $actions[] = [
@@ -341,43 +304,22 @@ class IntegrityService
             ];
         }
 
-        // Safe Repair 2: Expire overdue pending_payment orders
+        // Safe Repair 2: Expire overdue pending_payment orders via the single expiry path.
         foreach ($report['violations']['pending_payment_past_lock'] as $past) {
             $order = $this->orders->find($past['order_id']);
             if (!$order) {
                 continue;
             }
 
-            $actionDesc = "إلغاء الطلب المتأخر {$order->order_number} واستعادة المخزون";
-            if (!$dryRun) {
-                $this->orders->update($order->id, [
-                    'status'     => Wex::ORDER_STATUS_EXPIRED,
-                    'updated_at' => $nowStr,
-                ]);
-                $orderItems = $this->orderItems->where('order_id', $order->id)->findAll();
-                foreach ($orderItems as $item) {
-                    $db->query(
-                        'UPDATE products SET stock_quantity = stock_quantity + ?, updated_at = ? WHERE id = ?',
-                        [$item->quantity, $nowStr, $item->product_id]
-                    );
-                }
-                $this->orderEvents->insert(new OrderEvent([
-                    'order_id'      => $order->id,
-                    'from_status'   => Wex::ORDER_STATUS_PENDING_PAYMENT,
-                    'to_status'     => Wex::ORDER_STATUS_EXPIRED,
-                    'actor_user_id' => null,
-                    'event_type'    => 'order_expired',
-                    'meta'          => json_encode(['repaired_by' => 'integrity_repair']),
-                    'note'          => 'انتهت فترة حجز السعر المحددة للطلب وتم إلغاء الحجز وإعادة المنتجات إلى المخزون.',
-                    'created_at'    => $nowStr,
-                ]));
+            if (!$dryRun && !$this->orderService->refreshExpiry($order)) {
+                continue; // already expired/changed by someone else
             }
 
             $actions[] = [
                 'type'        => 'overdue_order_expired',
                 'order_id'    => $order->id,
                 'order_number'=> $order->order_number,
-                'action'      => $actionDesc,
+                'action'      => "إلغاء الطلب المتأخر {$order->order_number} واستعادة المخزون",
                 'dry_run'     => $dryRun,
             ];
         }
@@ -407,5 +349,47 @@ class IntegrityService
             'actions_count'  => count($actions),
             'actions'        => $actions,
         ];
+    }
+
+    /**
+     * Moves an orphan payment_review order to $targetStatus atomically.
+     * Returns false when the order is no longer in payment_review.
+     */
+    protected function repairOrphanOrder(\App\Entities\Order $order, string $targetStatus, string $nowStr): bool
+    {
+        $db = Database::connect();
+        $db->transBegin();
+        try {
+            $this->orderService->casStatus($order, Wex::ORDER_STATUS_PAYMENT_REVIEW, $targetStatus, $nowStr);
+
+            if ($targetStatus === Wex::ORDER_STATUS_EXPIRED) {
+                $this->orderService->restoreStock((int) $order->id);
+            }
+
+            $expired = $targetStatus === Wex::ORDER_STATUS_EXPIRED;
+            $this->orderEvents->insert(new OrderEvent([
+                'order_id'      => $order->id,
+                'from_status'   => Wex::ORDER_STATUS_PAYMENT_REVIEW,
+                'to_status'     => $targetStatus,
+                'actor_user_id' => null,
+                'event_type'    => $expired ? 'orphan_order_expired' : 'orphan_order_reset',
+                'meta'          => json_encode(['repaired_by' => 'integrity_repair']),
+                'note'          => $expired
+                    ? 'إلغاء الطلب لانتهاء مهلة حجز السعر بدون إشعار دفع'
+                    : 'إعادة الطلب إلى بانتظار التحويل لعدم وجود إشعار مرفوع',
+                'created_at'    => $nowStr,
+            ]));
+
+            $db->transCommit();
+
+            return true;
+        } catch (\App\Exceptions\ConflictException $e) {
+            $db->transRollback();
+
+            return false;
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
     }
 }
