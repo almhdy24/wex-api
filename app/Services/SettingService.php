@@ -232,7 +232,7 @@ class SettingService
             } elseif ($key === 'rounding_step_sdg') {
                 $val = (int) $value;
                 if ($val < 1 || $val > 1000) {
-                    $errors['rounding_step_sdg'] = 'خطوة التقريب يجب أن تكون بين 1 و 1000 جنيه.';
+                    $errors['rounding_step_sdg'] = 'خطوة التقريب يجب أن تكون بين 1 و 1000 ج.س.';
                 } else {
                     $updates[$key] = (string) $val;
                 }
@@ -307,7 +307,7 @@ class SettingService
     public function updateExchangeRate(int $rateSdg, ?int $userId = null, ?string $ip = null): array
     {
         if ($rateSdg < 100 || $rateSdg > 50000) {
-            throw new ValidationFailedException('سعر الصرف يجب أن يكون بين 100 و 50,000 جنيه سوداني للدرهم.', [
+            throw new ValidationFailedException('سعر الصرف يجب أن يكون بين 100 و 50,000 ج.س للدرهم.', [
                 'rate_sdg' => 'قيمة سعر الصرف خارج النطاق المقبول.',
             ]);
         }

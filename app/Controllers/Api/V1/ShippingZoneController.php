@@ -39,6 +39,6 @@ class ShippingZoneController extends BaseApiController
             'is_active'        => (bool) ($z->is_active ?? 1),
         ], $zones);
 
-        return $this->respondSuccess($data, 'مناطق التوصيل ورسوم الشحن');
+        return $this->respondSuccess($data, 'مناطق التوصيل ورسومها');
     }
 }
