@@ -54,7 +54,7 @@ class CategoryAdminController extends BaseApiController
             'name_en'    => $body['name_en'] ?? null,
             'slug'       => trim($slug, '-'),
             'sort_order' => isset($body['sort_order']) ? (int) $body['sort_order'] : 0,
-            'is_active'  => isset($body['is_active']) ? (int) (bool) $body['is_active'] : 1,
+            'is_active'  => isset($body['is_active']) ? (int) \App\Libraries\Input::bool($body['is_active']) : 1,
             'created_at' => $now,
             'updated_at' => $now,
         ]);

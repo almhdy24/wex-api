@@ -75,7 +75,7 @@ class PaymentAccountService
         $accountNumber = trim((string) ($data['account_number'] ?? ''));
         $branch        = isset($data['branch']) ? trim((string) $data['branch']) : null;
         $notes         = isset($data['notes']) ? trim((string) $data['notes']) : null;
-        $isActive      = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
+        $isActive      = isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1;
         $sortOrder     = isset($data['sort_order']) ? (int) $data['sort_order'] : 0;
 
         $errors = [];
@@ -173,7 +173,7 @@ class PaymentAccountService
         }
 
         if (isset($data['is_active'])) {
-            $updateData['is_active'] = (int) (bool) $data['is_active'];
+            $updateData['is_active'] = (int) \App\Libraries\Input::bool($data['is_active']);
         }
 
         if (isset($data['sort_order'])) {

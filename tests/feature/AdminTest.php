@@ -237,4 +237,19 @@ final class AdminTest extends CIUnitTestCase
         $this->assertArrayHasKey('entity', $body['data'][0]);
         $this->assertNotNull($body['meta']);
     }
+
+    // API-INP-01: {"is_active":"false"} must deactivate, not activate.
+    public function testStringFalseDeactivatesUser(): void
+    {
+        $res = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->adminToken,
+            'Content-Type'  => 'application/json',
+        ])->withBody(json_encode(['is_active' => 'false']))
+            ->patch("/api/v1/admin/users/{$this->customerUser->id}/status");
+
+        $res->assertStatus(200);
+        $this->assertFalse((bool) (new \App\Models\UserModel())->find($this->customerUser->id)->is_active);
+
+        (new \App\Models\UserModel())->update($this->customerUser->id, ['is_active' => 1]);
+    }
 }

@@ -383,8 +383,8 @@ class ProductService
             'specs'             => isset($data['specs']) ? (is_array($data['specs']) ? json_encode($data['specs'], JSON_UNESCAPED_UNICODE) : $data['specs']) : null,
             'warranty_text'     => $data['warranty_text'] ?? null,
             'stock_quantity'    => isset($data['stock_quantity']) ? (int) $data['stock_quantity'] : 0,
-            'is_active'         => isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1,
-            'is_featured'       => isset($data['is_featured']) ? (int) (bool) $data['is_featured'] : 0,
+            'is_active'         => isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1,
+            'is_featured'       => isset($data['is_featured']) ? (int) \App\Libraries\Input::bool($data['is_featured']) : 0,
             'created_at'        => $now,
             'updated_at'        => $now,
         ]);

@@ -52,7 +52,7 @@ class BrandAdminController extends BaseApiController
         $id = $this->brandModel->insert([
             'name'       => trim($body['name']),
             'slug'       => trim($slug, '-'),
-            'is_active'  => isset($body['is_active']) ? (int) (bool) $body['is_active'] : 1,
+            'is_active'  => isset($body['is_active']) ? (int) \App\Libraries\Input::bool($body['is_active']) : 1,
             'created_at' => $now,
             'updated_at' => $now,
         ]);

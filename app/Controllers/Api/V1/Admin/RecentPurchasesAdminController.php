@@ -47,7 +47,7 @@ class RecentPurchasesAdminController extends BaseApiController
         $user = $this->currentUser() ?? $this->request->auth_user;
         $body = $this->request->getJSON(true) ?? $this->request->getRawInput() ?? [];
 
-        $enabled = isset($body['ticker_enabled']) ? (bool) $body['ticker_enabled'] : false;
+        $enabled = isset($body['ticker_enabled']) ? \App\Libraries\Input::bool($body['ticker_enabled']) : false;
 
         $this->service->updateSettings(
             enabled: $enabled,

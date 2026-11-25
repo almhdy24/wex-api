@@ -207,7 +207,7 @@ class UserAdminController extends BaseApiController
             ]);
         }
 
-        $newStatus = (bool) $payload['is_active'];
+        $newStatus = \App\Libraries\Input::bool($payload['is_active']);
         $oldStatus = (bool) $user->is_active;
 
         $this->users->update($id, ['is_active' => $newStatus ? 1 : 0]);

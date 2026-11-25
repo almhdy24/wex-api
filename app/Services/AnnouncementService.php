@@ -76,8 +76,8 @@ class AnnouncementService
         $placement     = in_array($data['placement'] ?? '', ['banner', 'toast', 'home'], true) ? $data['placement'] : 'banner';
         $startsAt      = !empty($data['starts_at']) ? $data['starts_at'] : null;
         $endsAt        = !empty($data['ends_at']) ? $data['ends_at'] : null;
-        $isActive      = isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1;
-        $isDismissible = isset($data['is_dismissible']) ? (int) (bool) $data['is_dismissible'] : 1;
+        $isActive      = isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1;
+        $isDismissible = isset($data['is_dismissible']) ? (int) \App\Libraries\Input::bool($data['is_dismissible']) : 1;
         $sortOrder     = isset($data['sort_order']) ? (int) $data['sort_order'] : 0;
 
         $errors = [];
@@ -171,10 +171,10 @@ class AnnouncementService
             $update['ends_at'] = !empty($data['ends_at']) ? $data['ends_at'] : null;
         }
         if (isset($data['is_active'])) {
-            $update['is_active'] = (int) (bool) $data['is_active'];
+            $update['is_active'] = (int) \App\Libraries\Input::bool($data['is_active']);
         }
         if (isset($data['is_dismissible'])) {
-            $update['is_dismissible'] = (int) (bool) $data['is_dismissible'];
+            $update['is_dismissible'] = (int) \App\Libraries\Input::bool($data['is_dismissible']);
         }
         if (isset($data['sort_order'])) {
             $update['sort_order'] = (int) $data['sort_order'];

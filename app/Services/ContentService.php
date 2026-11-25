@@ -79,7 +79,7 @@ class ContentService
             'button_label' => isset($data['button_label']) ? trim((string) $data['button_label']) : null,
             'link'         => isset($data['link']) ? trim((string) $data['link']) : null,
             'sort_order'   => isset($data['sort_order']) ? (int) $data['sort_order'] : 0,
-            'is_active'    => isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1,
+            'is_active'    => isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1,
         ]);
 
         $id = (int) $this->heroSlides->insert($slide);
@@ -118,7 +118,7 @@ class ContentService
             $update['sort_order'] = (int) $data['sort_order'];
         }
         if (isset($data['is_active'])) {
-            $update['is_active'] = (int) (bool) $data['is_active'];
+            $update['is_active'] = (int) \App\Libraries\Input::bool($data['is_active']);
         }
 
         if (!empty($update)) {
@@ -214,7 +214,7 @@ class ContentService
             'source_value' => isset($data['source_value']) ? trim((string) $data['source_value']) : null,
             'limit'        => isset($data['limit']) ? max(1, min(24, (int) $data['limit'])) : 8,
             'sort_order'   => isset($data['sort_order']) ? (int) $data['sort_order'] : 0,
-            'is_active'    => isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1,
+            'is_active'    => isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1,
         ]);
 
         $id = (int) $this->homeSections->insert($sec);
@@ -257,7 +257,7 @@ class ContentService
             $update['sort_order'] = (int) $data['sort_order'];
         }
         if (isset($data['is_active'])) {
-            $update['is_active'] = (int) (bool) $data['is_active'];
+            $update['is_active'] = (int) \App\Libraries\Input::bool($data['is_active']);
         }
 
         if (!empty($update)) {
@@ -349,7 +349,7 @@ class ContentService
             'question'   => $question,
             'answer'     => $answer,
             'sort_order' => isset($data['sort_order']) ? (int) $data['sort_order'] : 0,
-            'is_active'  => isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1,
+            'is_active'  => isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1,
         ]);
 
         $id = (int) $this->faqItems->insert($faq);
@@ -383,7 +383,7 @@ class ContentService
             $update['sort_order'] = (int) $data['sort_order'];
         }
         if (isset($data['is_active'])) {
-            $update['is_active'] = (int) (bool) $data['is_active'];
+            $update['is_active'] = (int) \App\Libraries\Input::bool($data['is_active']);
         }
 
         if (!empty($update)) {
@@ -489,7 +489,7 @@ class ContentService
             'slug'      => $slug,
             'title'     => $title,
             'body'      => $body,
-            'is_active' => isset($data['is_active']) ? (int) (bool) $data['is_active'] : 1,
+            'is_active' => isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1,
         ]);
 
         $id = (int) $this->pages->insert($page);
@@ -531,7 +531,7 @@ class ContentService
             $update['body'] = $val;
         }
         if (isset($data['is_active'])) {
-            $update['is_active'] = (int) (bool) $data['is_active'];
+            $update['is_active'] = (int) \App\Libraries\Input::bool($data['is_active']);
         }
 
         if (!empty($update)) {
