@@ -50,7 +50,7 @@ class FakeProvider implements PushProviderInterface
 
         $this->sent[] = $record;
 
-        if ($this->logPath !== null) {
+        if ($this->logPath !== null && $this->logPath !== '') {
             $dir = dirname($this->logPath);
             if (!is_dir($dir)) {
                 @mkdir($dir, 0775, true);
