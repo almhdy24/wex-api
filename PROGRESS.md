@@ -16,7 +16,18 @@ Run tests ONE file at a time: `php vendor/bin/phpunit -c phpunit.dist.xml tests/
 - API-ORD-04 | High | PaymentProofService::reviewProof no order-status guard + race | Fixed | 2bb2333 | OrderIntegrityTest
 - API-ORD-05 | Medium | no audit for order/payment admin mutations | Fixed | eeef0af,2bb2333 | OrderIntegrityTest
 - API-ORD-06 | Medium | refreshExpiry not transactional | Fixed | eeef0af | (covered by OrderTest lazy expiry)
-- TODO wex-web: add TESTING_LOGIN_ENABLED=true to .github/workflows/e2e.yml API .env
+- API-ORD-07 | Medium | no idempotency on POST /orders | Fixed | 1b031ea | OrderIntegrityTest
+- API-ORD-08 | Medium | hex order suffix could spell AED (CI flake + leak) | Fixed | see log | OrderNumberTest
+- API-DEP-01 | Medium | composer.json php ^8.2 vs lock needs 8.3 | Fixed | see log | CI
+- API-USR-01 | Medium | DELETE /me kept unique email (re-signup 500), PII, push | Fixed | see log | AccountDeletionTest
+- API-PUSH-01 | High | push endpoint SSRF | Fixed | see log | PushEndpointPolicyTest
+- API-XSS-01 | Low | announcement link_url / shop_map_link javascript: | Fixed | see log | SafeUrlTest
+- API-PRD-01 | High | PATCH product no validation (price 0) | Fixed | see log | ProductAdminHardeningTest
+- API-PRD-02 | Medium | product mutations unaudited | Fixed | see log | ProductAdminHardeningTest
+- WEB-CHK-01 | High | checkout sent notes, API reads customer_notes (contract) | Fixed | wex-web | checkout-idempotency.test.js
+- WEB-CHK-02 | Medium | checkout no idempotency key | Fixed | wex-web | checkout-idempotency.test.js
+- CI: API phpunit workflow added (run 45610592681 green); wex-web e2e sets TESTING_LOGIN_ENABLED; ui-check PHP 8.3
+- NOTE: delete writable/database/test.sqlite before every fail-before check (persistent test DB pollutes results)
 
 ### Reviewed so far (API)
 Routes.php, Filters.php, Filters/*, Routing.php, AuthController, BaseApiController, OrderController,
