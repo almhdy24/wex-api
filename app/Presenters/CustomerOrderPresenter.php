@@ -88,6 +88,7 @@ class CustomerOrderPresenter
             'delivery_type'                 => (string) ($arr['delivery_type'] ?? ''),
             'delivery_phone'                => $arr['delivery_phone'] ?? null,
             'delivery_address'              => $arr['delivery_address'] ?? null,
+            'shipping_zone_name'            => $arr['shipping_zone_name'] ?? null,
             'customer_note'                 => $arr['customer_note'] ?? null,
             'payment'                       => $paymentBlock,
             'proofs'                        => $proofs,

@@ -758,6 +758,9 @@ class OrderService
             'delivery_type'                 => $order->delivery_type,
             'delivery_phone'                => $order->delivery_phone,
             'delivery_address'              => $order->delivery_address,
+            'shipping_zone_name'            => $order->shipping_zone_id
+                ? ($this->shippingZones->find((int) $order->shipping_zone_id)?->state_name_ar)
+                : null,
             'customer_note'                 => $order->customer_note,
             'payment'                       => $paymentBlock,
             'rate_sdg_snapshot'             => (int) $order->rate_sdg_snapshot,

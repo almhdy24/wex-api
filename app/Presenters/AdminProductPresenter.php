@@ -16,9 +16,13 @@ class AdminProductPresenter
     /**
      * Formats a single product for admin responses.
      */
-    public static function present(array|Product $data, ?int $rateSdg = null): array
+    public static function present(array|Product $data, ?int $rateSdg = null, ?array $brandNames = null): array
     {
         $arr = is_array($data) ? $data : $data->toArray();
+        $brandId = isset($arr['brand_id']) ? (int) $arr['brand_id'] : null;
+        if ($brandNames === null && $brandId) {
+            $brandNames = self::brandNames([$brandId]);
+        }
         $pricing = new PricingService();
         $rate = $rateSdg ?? $pricing->getCurrentRateSdg();
 
@@ -31,7 +35,8 @@ class AdminProductPresenter
             'id'                => (int) ($arr['id'] ?? 0),
             'type'              => (string) ($arr['type'] ?? ''),
             'category_id'       => isset($arr['category_id']) ? (int) $arr['category_id'] : null,
-            'brand_id'          => isset($arr['brand_id']) ? (int) $arr['brand_id'] : null,
+            'brand_id'          => $brandId,
+            'brand_name'        => $brandId ? ($brandNames[$brandId] ?? null) : null,
             'name'              => (string) ($arr['name'] ?? ''),
             'slug'              => (string) ($arr['slug'] ?? ''),
             'short_description' => $arr['short_description'] ?? null,
@@ -60,6 +65,33 @@ class AdminProductPresenter
         $pricing = new PricingService();
         $rate = $rateSdg ?? $pricing->getCurrentRateSdg();
 
-        return array_map(static fn($item) => self::present($item, $rate), $items);
+        $ids = [];
+        foreach ($items as $item) {
+            $a = is_array($item) ? $item : $item->toArray();
+            if (!empty($a['brand_id'])) {
+                $ids[] = (int) $a['brand_id'];
+            }
+        }
+        $brandNames = self::brandNames(array_values(array_unique($ids)));
+
+        return array_map(static fn($item) => self::present($item, $rate, $brandNames), $items);
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return array<int, string>
+     */
+    private static function brandNames(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        $out = [];
+        foreach ((new \App\Models\BrandModel())->whereIn('id', $ids)->findAll() as $b) {
+            $b = is_array($b) ? (object) $b : $b;
+            $out[(int) $b->id] = (string) $b->name;
+        }
+
+        return $out;
     }
 }

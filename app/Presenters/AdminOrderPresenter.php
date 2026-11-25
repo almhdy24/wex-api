@@ -104,6 +104,7 @@ class AdminOrderPresenter
             'delivery_type'                 => (string) ($arr['delivery_type'] ?? ''),
             'delivery_phone'                => $arr['delivery_phone'] ?? null,
             'delivery_address'              => $arr['delivery_address'] ?? null,
+            'shipping_zone_name'            => $arr['shipping_zone_name'] ?? null,
             'customer_note'                 => $arr['customer_note'] ?? null,
             'rate_sdg_snapshot'             => (int) ($arr['rate_sdg_snapshot'] ?? 0),
             'app_discount_percent_snapshot' => (int) ($arr['app_discount_percent_snapshot'] ?? 0),
