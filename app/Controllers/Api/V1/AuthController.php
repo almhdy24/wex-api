@@ -106,9 +106,8 @@ class AuthController extends BaseApiController
      */
     public function testingLogin(): ResponseInterface
     {
-        $env = getenv('CI_ENVIRONMENT') ?: (defined('ENVIRONMENT') ? ENVIRONMENT : 'development');
-        if (strtolower($env) === 'production') {
-            return $this->respondError('غير متاح في هذه البيئة', 404);
+        if (!self::testingLoginEnabled()) {
+            return $this->respondError('المورد المطلوب غير موجود', 404);
         }
 
         $body = $this->getJsonBody();
@@ -141,6 +140,21 @@ class AuthController extends BaseApiController
         ];
 
         return $this->respondSuccess($data, 'تم تسجيل الدخول بنجاح لبيئة الاختبار');
+    }
+
+    /**
+     * testing-login mints a session for ANY account (admins included) from an email alone.
+     * It must be explicitly opted into (TESTING_LOGIN_ENABLED=true) and is never
+     * available when the effective environment is production.
+     */
+    public static function testingLoginEnabled(): bool
+    {
+        $env = strtolower((string) (getenv('CI_ENVIRONMENT') ?: ENVIRONMENT));
+        if ($env === 'production' || ENVIRONMENT === 'production') {
+            return false;
+        }
+
+        return filter_var(env('TESTING_LOGIN_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
     }
 
     /**

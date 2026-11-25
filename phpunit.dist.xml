@@ -40,6 +40,7 @@
         <env name="JWT_SECRET" value="super-secret-jwt-key-for-testing-at-least-32-chars!"/>
         <env name="encryption.key" value="hex2bin:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"/>
         <env name="MAIL_DRIVER" value="log"/>
+        <env name="GOOGLE_CLIENT_IDS" value="sample-web-client-id.apps.googleusercontent.com"/>
         <env name="database.tests.DBDriver" value="SQLite3"/>
         <env name="database.tests.database" value="database/test.sqlite"/>
         <!-- Directory containing phpunit.xml -->
