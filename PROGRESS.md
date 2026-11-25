@@ -1,5 +1,29 @@
 # Wex Technology API - Project Progress Tracker
 
+## Deep Review & Hardening Pass (Branch: stabilize) — Active (started 2026-11-25)
+
+Resume notes: findings ledger lives here until docs/CODE_REVIEW.md is written.
+Run tests ONE file at a time: `php vendor/bin/phpunit -c phpunit.dist.xml tests/feature/X.php`.
+
+### Findings ledger (ID | sev | file | status | commit | test)
+- API-AUTH-01 | High | AuthController::testingLogin (any-email login off-prod) | Fixed | a664ba1 | AuthHardeningTest
+- API-AUTH-02 | High | GoogleAuthService aud skipped when unconfigured | Fixed | 0f11fe9 | AuthHardeningTest
+- API-AUTH-03 | Medium | OtpService attempts/consume race | Fixed | 8482196 | AuthHardeningTest
+- API-AUTH-04 | Medium | OtpService no per-email cap | Fixed | 8482196 | AuthHardeningTest
+- API-ORD-01 | High | OrderService::updateOrderStatus double stock restore race | Fixed | eeef0af | OrderIntegrityTest
+- API-ORD-02 | Medium | StateMachine: no restock from ready/out_for_delivery cancel | Fixed | eeef0af | OrderIntegrityTest
+- API-ORD-03 | Medium | delivery-type vs status mismatch allowed | Fixed | eeef0af | OrderIntegrityTest
+- API-ORD-04 | High | PaymentProofService::reviewProof no order-status guard + race | Fixed | 2bb2333 | OrderIntegrityTest
+- API-ORD-05 | Medium | no audit for order/payment admin mutations | Fixed | eeef0af,2bb2333 | OrderIntegrityTest
+- API-ORD-06 | Medium | refreshExpiry not transactional | Fixed | eeef0af | (covered by OrderTest lazy expiry)
+- TODO wex-web: add TESTING_LOGIN_ENABLED=true to .github/workflows/e2e.yml API .env
+
+### Reviewed so far (API)
+Routes.php, Filters.php, Filters/*, Routing.php, AuthController, BaseApiController, OrderController,
+Admin/OrderAdminController, Admin/PaymentAdminController, PaymentProofController, AuthService, TokenService,
+OtpService, GoogleAuthService, OrderService, OrderStateMachine, PaymentProofService, ImageService, AuditLogService
+
+
 ## Push Notification System Sprint (Branch: stabilize) — Active
 
 - [x] **Phase 2: Event Wiring (`wex-api`)**
