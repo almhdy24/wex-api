@@ -159,4 +159,18 @@ final class AnnouncementsTest extends CIUnitTestCase
         $model = new AnnouncementModel();
         $this->assertNull($model->find($id));
     }
+
+    // API-XSS-01: script URLs must be rejected for storefront links.
+    public function testAnnouncementRejectsJavascriptLink(): void
+    {
+        $res = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->adminToken,
+            'Content-Type'  => 'application/json',
+        ])->withBody(json_encode([
+            'title' => 'عرض', 'body' => 'نص', 'link_url' => 'javascript:alert(document.cookie)',
+        ]))->post('/api/v1/admin/announcements');
+
+        $res->assertStatus(422);
+        $this->assertArrayHasKey('link_url', json_decode($res->getJSON(), true)['errors']);
+    }
 }

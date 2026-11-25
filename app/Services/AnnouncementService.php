@@ -87,6 +87,9 @@ class AnnouncementService
         if ($body === '') {
             $errors['body'] = 'نص الإعلان مطلوب.';
         }
+        if (!\App\Libraries\SafeUrl::isSafeLink($linkUrl)) {
+            $errors['link_url'] = 'رابط الإعلان غير صالح، استخدم مساراً يبدأ بـ / أو رابطاً يبدأ بـ https://';
+        }
         if ($startsAt && $endsAt && strtotime($startsAt) > strtotime($endsAt)) {
             $errors['ends_at'] = 'تاريخ نهاية الإعلان يجب أن يكون بعد تاريخ البداية.';
         }
@@ -152,6 +155,11 @@ class AnnouncementService
         }
         if (array_key_exists('link_url', $data)) {
             $update['link_url'] = $data['link_url'] !== null ? trim((string) $data['link_url']) : null;
+            if (!\App\Libraries\SafeUrl::isSafeLink($update['link_url'])) {
+                throw new ValidationFailedException('رابط الإعلان غير صالح.', [
+                    'link_url' => 'رابط الإعلان غير صالح، استخدم مساراً يبدأ بـ / أو رابطاً يبدأ بـ https://',
+                ]);
+            }
         }
         if (isset($data['placement']) && in_array($data['placement'], ['banner', 'toast', 'home'], true)) {
             $update['placement'] = $data['placement'];

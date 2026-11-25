@@ -243,6 +243,13 @@ class SettingService
                 } else {
                     $updates[$key] = (string) $val;
                 }
+            } elseif ($key === 'shop_map_link') {
+                $val = trim((string) $value);
+                if (!\App\Libraries\SafeUrl::isSafeLink($val)) {
+                    $errors['shop_map_link'] = 'رابط الخريطة غير صالح، يجب أن يبدأ بـ https://';
+                } else {
+                    $updates[$key] = $val;
+                }
             } else {
                 // String settings
                 $updates[$key] = trim((string) $value);

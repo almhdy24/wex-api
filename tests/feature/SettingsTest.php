@@ -221,4 +221,15 @@ final class SettingsTest extends CIUnitTestCase
         $zoneModel = new ShippingZoneModel();
         $this->assertNull($zoneModel->find($zoneId));
     }
+
+    // API-XSS-01: shop_map_link is rendered as href in the storefront footer.
+    public function testShopMapLinkRejectsJavascriptUrl(): void
+    {
+        $res = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->adminToken,
+            'Content-Type'  => 'application/json',
+        ])->withBody(json_encode(['shop_map_link' => 'javascript:alert(1)']))->patch('/api/v1/admin/settings');
+
+        $res->assertStatus(422);
+    }
 }
