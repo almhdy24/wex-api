@@ -74,7 +74,12 @@ final class ArabicSearchTest extends CIUnitTestCase
                 'price_aed' => 20, 'category_id' => $catId, 'stock_quantity' => 3,
             ]))->post('/api/v1/admin/products')->assertStatus(201);
 
-        $this->assertContains('شاحن سامسونج سريع', $this->names('samsung charger'));
-        $this->assertContains('شاحن سامسونج سريع', $this->names('سامسونغ'));
+        try {
+            $this->assertContains('شاحن سامسونج سريع', $this->names('samsung charger'));
+            $this->assertContains('شاحن سامسونج سريع', $this->names('سامسونغ'));
+        } finally {
+            // the suite shares one database: do not change other tests' product counts
+            \Config\Database::connect()->table('products')->where('name', 'شاحن سامسونج سريع')->delete();
+        }
     }
 }

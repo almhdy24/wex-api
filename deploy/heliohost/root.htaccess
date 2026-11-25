@@ -30,6 +30,12 @@ AddType image/avif .avif
     RewriteRule \.(?:sql|sqlite3?|db|log|env|bak|ini|lock|md|sh|dist|yml|yaml|zip|gz|tar)$ - [F,L,NC]
     RewriteRule (^|/)(?:composer\.(?:json|lock)|package(?:-lock)?\.json|spark|phpunit[^/]*|MANIFEST\.txt)$ - [F,L,NC]
 
+    # 3a. Pass the Authorization header to PHP (dropped by PHP-FPM/CGI setups, which
+    #     breaks every Bearer-authenticated API call). Becomes REDIRECT_HTTP_AUTHORIZATION
+    #     after the internal rewrite; api/index.php restores it.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
     # 3. API → front controller (keeps /api/v1/... intact)
     RewriteCond %{REQUEST_URI} !^/api/index\.php$
     RewriteRule ^api(?:/.*)?$ api/index.php [L,QSA]

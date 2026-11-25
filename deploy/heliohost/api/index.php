@@ -16,6 +16,20 @@ if (version_compare(PHP_VERSION, $minPhpVersion, '<')) {
     exit(1);
 }
 
+// Restore the Authorization header where Apache/PHP-FPM drops it (see root .htaccess).
+if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
+    if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $_SERVER['HTTP_AUTHORIZATION'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    } elseif (function_exists('apache_request_headers')) {
+        foreach (apache_request_headers() as $name => $value) {
+            if (strcasecmp($name, 'Authorization') === 0) {
+                $_SERVER['HTTP_AUTHORIZATION'] = $value;
+                break;
+            }
+        }
+    }
+}
+
 $webRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR;
 $coreDir = $webRoot . '__WEX_CORE_DIR__';
 
