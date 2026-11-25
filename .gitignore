@@ -69,3 +69,4 @@ Thumbs.db
 writable/cron.lock
 writable/cron_state.json
 writable/install.lock
+writable/*.sqlite

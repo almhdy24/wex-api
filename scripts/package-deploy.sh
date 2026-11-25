@@ -28,7 +28,7 @@ rsync -a --delete \
   --exclude '.git' --exclude 'tests' --exclude 'build' --exclude 'docs' --exclude 'scripts' \
   --exclude 'deploy' --exclude 'public' --exclude 'node_modules' --exclude '.github' \
   --exclude '.env' --exclude 'env' --exclude 'phpunit*' --exclude '*.md' \
-  --exclude 'writable/database/*.sqlite' --exclude 'writable/logs/*' --exclude 'writable/cache/*' \
+  --exclude 'writable/*.sqlite' --exclude 'writable/database/*.sqlite' --exclude 'writable/logs/*' --exclude 'writable/cache/*' \
   --exclude 'writable/session/*' --exclude 'writable/uploads/*' --exclude 'writable/debugbar/*' \
   --exclude 'writable/*.lock' --exclude 'writable/cron_state.json' \
   "$API_DIR/" "$ROOT/$CORE/"
@@ -58,8 +58,9 @@ for f in index.html .htaccess api/index.php api/.htaccess "$CORE/.htaccess" "$CO
 done
 [ -e "$ROOT/$CORE/.env" ] && fail ".env must not be shipped"
 grep -q "__WEX_CORE_DIR__" "$ROOT/.htaccess" "$ROOT/api/index.php" && fail "unsubstituted core dir"
-find "$ROOT" \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' -o -name '*.log' -o -name '.git' -o -name 'phpunit*' \) \
-  -not -path '*/vendor/*' | grep -q . && fail "dev/secret files present"
+BAD=$(find "$ROOT" \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' -o -name '*.log' -o -name '.git' -o -name 'phpunit*' -o -name '.env' \) \
+  -not -path '*/vendor/*')
+[ -n "$BAD" ] && { echo "$BAD" >&2; fail "dev/secret files present"; }
 [ -d "$ROOT/$CORE/tests" ] && fail "tests shipped"
 # no obvious secrets in shipped config (only the example file may mention the keys, empty)
 grep -RIlE "JWT_SECRET *= *[^[:space:]]{8,}|SMTPPass *= *[^[:space:]]+" "$ROOT/$CORE" --include='*.php' --include='.env*' && fail "secret-looking value found"
