@@ -62,8 +62,10 @@ BAD=$(find "$ROOT" \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' -o -
   -not -path '*/vendor/*')
 [ -n "$BAD" ] && { echo "$BAD" >&2; fail "dev/secret files present"; }
 [ -d "$ROOT/$CORE/tests" ] && fail "tests shipped"
-# no obvious secrets in shipped config (only the example file may mention the keys, empty)
-grep -RIlE "JWT_SECRET *= *[^[:space:]]{8,}|SMTPPass *= *[^[:space:]]+" "$ROOT/$CORE" --include='*.php' --include='.env*' && fail "secret-looking value found"
+# no secret values in shipped env files (keys must be present but empty in the example)
+SECRETS=$(grep -RHE "^(JWT_SECRET|encryption\.key|INSTALL_TOKEN|CRON_TOKEN|VAPID_PRIVATE_KEY|email\.SMTPPass|database\.default\.password) *= *[^[:space:]]" \
+  "$ROOT/$CORE" --include='.env*' 2>/dev/null || true)
+[ -n "$SECRETS" ] && { echo "$SECRETS" >&2; fail "secret value in a shipped env file"; }
 php -l "$ROOT/api/index.php" >/dev/null
 
 echo "==> manifest + zip"
