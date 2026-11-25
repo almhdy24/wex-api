@@ -11,6 +11,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
     // Health check
     $routes->get('ping', 'PingController::index');
 
+    // Shared-hosting internals (404 unless CRON_TOKEN / INSTALL_TOKEN are configured)
+    $routes->match(['get', 'post'], 'internal/cron', 'InternalController::cron', ['filter' => 'throttle:12,60,cron']);
+    $routes->post('internal/install', 'InternalController::install', ['filter' => 'throttle:5,600,install']);
+
     // Authentication (Public)
     $routes->group('auth', static function (RouteCollection $routes) {
         $routes->post('google', 'AuthController::google', ['filter' => 'throttle:30,60,google_auth']);
