@@ -37,4 +37,12 @@ final class PingTest extends CIUnitTestCase
         $this->assertFalse($body['success']);
         $this->assertSame('الرابط المطلوب غير موجود', $body['message']);
     }
+
+    // CORS-01: Date must be readable cross-origin (price-lock countdown server clock).
+    public function testCorsExposesDateHeader(): void
+    {
+        $result = $this->withHeaders(['Origin' => 'http://localhost:5173'])->get('api/v1/ping');
+        $expose = $result->response()->getHeaderLine('Access-Control-Expose-Headers');
+        $this->assertStringContainsString('Date', $expose);
+    }
 }
