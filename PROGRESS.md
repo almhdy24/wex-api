@@ -9,7 +9,10 @@ Phase 0 (truth & green):
 - [ ] VIS-06 verify from next snapshot screenshots.
 - [x] PHPUnit on SQLite + MySQL 8 + MariaDB 10.6: 161 tests green on all (run 45632966956).
 - [x] D-5 exception headers, upload pixel limit + no copy fallback, D-10 ResponseContractTest (+ shipping_zone_name, brand_name, delivery_type fixes), D-8 N+1, D-7 index, D-9 memo, D-6 axios removed, GET de-dup.
-Next: Phase 1 HelioHost layout/packaging.
+- [x] VIS-06: harness artifact (SW bypassed mocks); harnesses block SW.
+Phase 1 (HelioHost): DONE — deploy/heliohost layout, package-deploy.sh, deploy-package.yml; smoke 51/51 GREEN run 45656054300 (found+fixed: Authorization header dropped by Apache, installer state leak). Cron runner + installer (InternalEndpointsTest). docs/DEPLOY_HELIOHOST.md.
+Phase 2/4 so far: Arabic search (ArabicSearchTest), SW product cache 12h->network-first 10min, GET dedup, WhatsApp share + order help, SEO meta/JSON-LD/sitemap (SeoTest + smoke), claims (أصلي, الأكثر طلباً) removed + scanners.
+Next: Phase 3 glossary/copy checker + fixes; UX audit doc; report.
 
 
 ## Deep Review & Hardening Pass (Branch: stabilize) — Active (started 2026-11-25)
