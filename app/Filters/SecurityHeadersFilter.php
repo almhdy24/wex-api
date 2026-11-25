@@ -37,7 +37,11 @@ class SecurityHeadersFilter implements FilterInterface
         $response->setHeader('X-Frame-Options', 'DENY');
         $response->setHeader('Referrer-Policy', 'no-referrer');
         $response->setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-        $response->setHeader('Content-Security-Policy', "default-src 'none'");
+        // JSON API responses get the strictest policy; HTML pages rendered by
+        // SeoController set the app's own CSP and must keep it.
+        if (!$response->hasHeader('Content-Security-Policy')) {
+            $response->setHeader('Content-Security-Policy', "default-src 'none'");
+        }
 
         // Prevent caching on authenticated or mutating responses
         if ($request->hasHeader('Authorization') || strtoupper($request->getMethod()) !== 'GET') {

@@ -43,6 +43,15 @@ for p in / /admin/products "/products/$SLUG" /catalog /faq /orders /cart; do
 done
 expect_code "404" "$BASE/assets/does-not-exist.js"
 
+# 4b. Link previews / SEO: product pages carry server-side meta + Product JSON-LD
+page=$(curl -sk "$BASE/products/$SLUG")
+grep -q 'property="og:title"' <<<"$page" && grep -q 'property="og:image"' <<<"$page" && ok "og tags on product page" || bad "og tags missing"
+grep -q '"@type":"Product"' <<<"$page" && grep -q '"priceCurrency":"SDG"' <<<"$page" && ok "Product JSON-LD" || bad "Product JSON-LD missing"
+grep -qE 'AED|درهم' <<<"$page" && bad "AED on product page" || ok "no AED on product page"
+expect_code "404" "$BASE/products/no-such-slug-xyz"
+xml=$(curl -sk "$BASE/sitemap.xml"); grep -q "/products/$SLUG</loc>" <<<"$xml" && ok "sitemap lists products" || bad "sitemap"
+curl -sk "$BASE/robots.txt" | grep -q 'Disallow: /admin' && ok "robots.txt" || bad "robots.txt
+
 # 5. Caching and security headers
 h=$(hdr "$BASE/"); grep -qi '^cache-control: no-cache' <<<"$h" && ok "index.html no-cache" || bad "index.html cache-control"
 grep -qi "^content-security-policy: default-src 'self'" <<<"$h" && ok "CSP on app shell" || bad "CSP missing"

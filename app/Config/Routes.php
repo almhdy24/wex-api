@@ -229,5 +229,15 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
     });
 });
 
+// Public storefront pages rendered with server-side meta (crawlers / WhatsApp previews).
+// The SPA takes over in the browser; see App\Services\SeoService.
+$routes->get('/', 'SeoController::page');
+$routes->get('catalog', 'SeoController::page/catalog');
+$routes->get('faq', 'SeoController::page/faq');
+$routes->get('products/(:segment)', 'SeoController::page/products/$1');
+$routes->get('pages/(:segment)', 'SeoController::page/pages/$1');
+$routes->get('sitemap.xml', 'SeoController::sitemap');
+$routes->get('robots.txt', 'SeoController::robots');
+
 // Fallback 404 Override for API JSON envelope
 $routes->set404Override('App\Controllers\Api\V1\ErrorController::notFound');

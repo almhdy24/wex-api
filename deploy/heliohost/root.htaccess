@@ -40,6 +40,10 @@ AddType image/avif .avif
     RewriteCond %{REQUEST_URI} !^/api/index\.php$
     RewriteRule ^api(?:/.*)?$ api/index.php [L,QSA]
 
+    # 3b. Public storefront pages get server-side meta (WhatsApp/social previews, search
+    #     engines); the same SPA shell is returned, so the app behaves identically.
+    RewriteRule ^(?:|catalog|faq|products/[^/]+|pages/[^/]+|sitemap\.xml|robots\.txt)$ api/index.php [L,QSA]
+
     # 4. Real files are served as-is
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
