@@ -457,6 +457,13 @@ class PushService
                 }
             }
 
+            // Claim the row with a short lease before sending. Inline delivery and the
+            // push:work cron (or two overlapping cron runs) could otherwise both send it.
+            // A worker that dies mid-send leaves the row eligible again once the lease ends.
+            if (!$this->claimOutboxRow((int) $row['id'])) {
+                continue;
+            }
+
             $provider = $this->resolveProvider((string) $sub->provider);
             $result   = $provider->send($sub, $payload);
             $now      = gmdate('Y-m-d H:i:s');
@@ -507,6 +514,23 @@ class PushService
         }
 
         return $stats;
+    }
+
+    public const CLAIM_LEASE_SECONDS = 300;
+
+    protected function claimOutboxRow(int $id): bool
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        $this->outbox->builder()
+            ->where('id', $id)
+            ->where('status', 'pending')
+            ->groupStart()
+                ->where('next_attempt_at IS NULL', null, false)
+                ->orWhere('next_attempt_at <=', $now)
+            ->groupEnd()
+            ->update(['next_attempt_at' => gmdate('Y-m-d H:i:s', time() + self::CLAIM_LEASE_SECONDS)]);
+
+        return $this->outbox->db->affectedRows() === 1;
     }
 
     protected function resolveProvider(string $providerName): PushProviderInterface
