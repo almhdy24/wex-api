@@ -1,0 +1,54 @@
+name: API PHPUnit (CI only)
+
+on:
+  push:
+    branches: [ stabilize, main ]
+  pull_request:
+    branches: [ stabilize, main ]
+  workflow_dispatch:
+
+concurrency:
+  group: phpunit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: sqlite3, pdo_sqlite, mbstring, intl, json, gd
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Validate composer and lint PHP
+        run: |
+          composer validate --no-check-publish
+          find app tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Prepare writable dirs
+        run: |
+          mkdir -p writable/database writable/uploads writable/cache writable/logs writable/session
+          chmod -R 777 writable
+
+      - name: Run full PHPUnit suite
+        run: vendor/bin/phpunit -c phpunit.dist.xml
+
+      - name: Migration down/up round-trip (SQLite)
+        run: |
+          printf 'CI_ENVIRONMENT=development\ndatabase.default.DBDriver=SQLite3\ndatabase.default.database=roundtrip.sqlite\n' > .env
+          php spark migrate --all
+          php spark migrate:rollback -b 0 -f || php spark migrate:rollback -f
+          php spark migrate --all
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpunit-logs
+          path: writable/logs
