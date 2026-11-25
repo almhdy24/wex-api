@@ -107,7 +107,7 @@ class AuthController extends BaseApiController
     public function testingLogin(): ResponseInterface
     {
         $env = getenv('CI_ENVIRONMENT') ?: (defined('ENVIRONMENT') ? ENVIRONMENT : 'development');
-        if (strtolower($env) !== 'testing') {
+        if (strtolower($env) === 'production') {
             return $this->respondError('غير متاح في هذه البيئة', 404);
         }
 
