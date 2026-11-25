@@ -436,5 +436,11 @@ class ProductsSeeder extends Seeder
                 ]);
             }
         }
+
+        // Build the Arabic-normalised search index for the seeded catalogue.
+        $service = new \App\Services\ProductService();
+        foreach ($this->db->table('products')->select('id')->get()->getResultArray() as $row) {
+            $service->refreshSearchText((int) $row['id']);
+        }
     }
 }

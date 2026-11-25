@@ -136,15 +136,9 @@ class ProductService
             $builder->where('stock_quantity >', 0);
         }
 
-        // Search Query (q)
+        // Search Query (q): Arabic-normalised, cross-script, every word must match.
         if (!empty($filters['q'])) {
-            $term = trim((string) $filters['q']);
-            $builder->groupStart()
-                ->like('name', $term)
-                ->orLike('short_description', $term)
-                ->orLike('description', $term)
-                ->orLike('specs', $term)
-                ->groupEnd();
+            $this->applySearch($builder, (string) $filters['q']);
         }
 
         // Sorting (whitelist allowed sorts only)
@@ -373,11 +367,7 @@ class ProductService
             $builder->where('is_active', (int) $filters['is_active']);
         }
         if (!empty($filters['q'])) {
-            $term = trim((string) $filters['q']);
-            $builder->groupStart()
-                ->like('name', $term)
-                ->orLike('slug', $term)
-                ->groupEnd();
+            $this->applySearch($builder, (string) $filters['q']);
         }
 
         $total = $builder->countAllResults(false);
@@ -417,6 +407,7 @@ class ProductService
         ]);
 
         $this->settingService->touchPricesUpdatedAt();
+        $this->refreshSearchText((int) $id);
 
         return $this->productModel->find($id);
     }
@@ -476,6 +467,8 @@ class ProductService
             if (array_key_exists('price_aed', $updateFields)) {
                 $this->settingService->touchPricesUpdatedAt();
             }
+            $this->refreshSearchText($id);
+            $product = $this->productModel->find($id);
         }
 
         return $product;
@@ -546,6 +539,43 @@ class ProductService
             ->where('product_id', $productId)
             ->where('accessory_id', $accessoryId)
             ->delete();
+    }
+
+    /**
+     * Every normalised query word must appear in search_text (or the raw name/slug, for
+     * rows saved before search_text existed).
+     */
+    protected function applySearch($builder, string $query): void
+    {
+        $tokens = \App\Libraries\ArabicSearch::tokens($query);
+        if ($tokens === []) {
+            return;
+        }
+        foreach ($tokens as $tok) {
+            $builder->groupStart()
+                ->like('search_text', ' ' . $tok)          // word-start match
+                ->orGroupStart()
+                    ->where('search_text', null)            // rows not yet indexed
+                    ->like('name', $tok)
+                ->groupEnd()
+                ->groupEnd();
+        }
+    }
+
+    /** Recomputes products.search_text from the product and its brand/category names. */
+    public function refreshSearchText(int $productId): void
+    {
+        $p = $this->productModel->withDeleted()->find($productId);
+        if (!$p) {
+            return;
+        }
+        $brand = $p->brand_id ? $this->brandModel->find($p->brand_id) : null;
+        $cat   = $p->category_id ? $this->categoryModel->find($p->category_id) : null;
+        $specs = is_string($p->specs ?? null) ? $p->specs : json_encode($p->specs ?? [], JSON_UNESCAPED_UNICODE);
+        $this->productModel->builder()->where('id', $productId)->update(['search_text' => \App\Libraries\ArabicSearch::index(
+            (string) $p->name, (string) ($p->short_description ?? ''), (string) ($p->description ?? ''), (string) $specs,
+            (string) ($brand->name ?? ''), trim(($cat->name_ar ?? '') . ' ' . ($cat->name_en ?? '')),
+        )]);
     }
 
     /**

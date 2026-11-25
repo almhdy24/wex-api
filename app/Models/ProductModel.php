@@ -28,6 +28,7 @@ class ProductModel extends Model
         'stock_quantity',
         'is_active',
         'is_featured',
+        'search_text',
     ];
 
     protected $useTimestamps = true;
