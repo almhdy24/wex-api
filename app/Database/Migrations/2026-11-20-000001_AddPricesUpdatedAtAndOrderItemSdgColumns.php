@@ -64,7 +64,11 @@ class AddPricesUpdatedAtAndOrderItemSdgColumns extends Migration
 
     public function down()
     {
-        $this->forge->dropColumn('order_items', ['unit_price_sdg', 'line_total_sdg']);
-        $this->db->table('settings')->where('key', 'prices_updated_at')->delete();
+        if ($this->db->tableExists('order_items')) {
+            $this->forge->dropColumn('order_items', ['unit_price_sdg', 'line_total_sdg']);
+        }
+        if ($this->db->tableExists('settings')) {
+            $this->db->table('settings')->where('key', 'prices_updated_at')->delete();
+        }
     }
 }

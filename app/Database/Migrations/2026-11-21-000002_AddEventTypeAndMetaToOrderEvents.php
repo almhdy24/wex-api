@@ -79,6 +79,8 @@ class AddEventTypeAndMetaToOrderEvents extends Migration
 
     public function down()
     {
-        $this->forge->dropColumn('order_events', ['event_type', 'meta']);
+        if ($this->db->tableExists('order_events')) {
+            $this->forge->dropColumn('order_events', ['event_type', 'meta']);
+        }
     }
 }

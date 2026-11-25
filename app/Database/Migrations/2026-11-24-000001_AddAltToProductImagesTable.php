@@ -16,11 +16,15 @@ class AddAltToProductImagesTable extends Migration
             ],
         ];
 
-        $this->forge->addColumn('product_images', $fields);
+        if ($this->db->tableExists('product_images') && !$this->db->fieldExists('alt', 'product_images')) {
+            $this->forge->addColumn('product_images', $fields);
+        }
     }
 
     public function down()
     {
-        $this->forge->dropColumn('product_images', 'alt');
+        if ($this->db->tableExists('product_images') && $this->db->fieldExists('alt', 'product_images')) {
+            $this->forge->dropColumn('product_images', 'alt');
+        }
     }
 }

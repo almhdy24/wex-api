@@ -378,5 +378,63 @@ class ProductsSeeder extends Seeder
                 }
             }
         }
+
+        // Seed product images for all laptops
+        foreach ($laptops as $laptop) {
+            $pId = $laptopProductIds[$laptop['slug']] ?? null;
+            if (!$pId) continue;
+
+            $hasImg = $this->db->table('product_images')->where('product_id', $pId)->countAllResults();
+            if ($hasImg === 0) {
+                $this->db->table('product_images')->insert([
+                    'product_id' => $pId,
+                    'path'       => '/uploads/products/' . $laptop['slug'] . '.jpg',
+                    'thumb_path' => '/uploads/products/' . $laptop['slug'] . '_thumb.jpg',
+                    'sort_order' => 1,
+                    'is_primary' => 1,
+                    'alt'        => $laptop['name'],
+                    'created_at' => $now,
+                ]);
+
+                $this->db->table('product_images')->insert([
+                    'product_id' => $pId,
+                    'path'       => '/uploads/products/' . $laptop['slug'] . '-2.jpg',
+                    'thumb_path' => '/uploads/products/' . $laptop['slug'] . '-2_thumb.jpg',
+                    'sort_order' => 2,
+                    'is_primary' => 0,
+                    'alt'        => $laptop['name'] . ' - زاوية جانبية',
+                    'created_at' => $now,
+                ]);
+            }
+        }
+
+        // Seed product images for all accessories
+        foreach ($accessories as $acc) {
+            $p = $this->db->table('products')->where('slug', $acc['slug'])->get()->getRow();
+            if (!$p) continue;
+
+            $hasImg = $this->db->table('product_images')->where('product_id', $p->id)->countAllResults();
+            if ($hasImg === 0) {
+                $this->db->table('product_images')->insert([
+                    'product_id' => $p->id,
+                    'path'       => '/uploads/products/' . $acc['slug'] . '.jpg',
+                    'thumb_path' => '/uploads/products/' . $acc['slug'] . '_thumb.jpg',
+                    'sort_order' => 1,
+                    'is_primary' => 1,
+                    'alt'        => $acc['name'],
+                    'created_at' => $now,
+                ]);
+
+                $this->db->table('product_images')->insert([
+                    'product_id' => $p->id,
+                    'path'       => '/uploads/products/' . $acc['slug'] . '-2.jpg',
+                    'thumb_path' => '/uploads/products/' . $acc['slug'] . '-2_thumb.jpg',
+                    'sort_order' => 2,
+                    'is_primary' => 0,
+                    'alt'        => $acc['name'] . ' - ملحق إضافي',
+                    'created_at' => $now,
+                ]);
+            }
+        }
     }
 }
