@@ -2,7 +2,8 @@
 
 ## Deep Review & Hardening Pass (Branch: stabilize) — Active (started 2026-11-25)
 
-Resume notes: findings ledger lives here until docs/CODE_REVIEW.md is written.
+Resume notes: full findings table is now in docs/CODE_REVIEW.md; coverage in docs/REVIEW_COVERAGE.md; map in docs/SYSTEM_MAP.md.
+NEXT: fix e2e 03 (admin order card click on mobile) and 07 (home IA), write Phase 4 e2e (concurrency, authz, uploads, admin crawler), continue reading the 'no' rows in REVIEW_COVERAGE.
 Run tests ONE file at a time: `php vendor/bin/phpunit -c phpunit.dist.xml tests/feature/X.php`.
 
 ### Findings ledger (ID | sev | file | status | commit | test)
