@@ -1,0 +1,76 @@
+# ==========================================================================
+# Wex — single-directory deployment (React SPA + CodeIgniter API)
+# Requires Apache 2.4 with AllowOverride All (mod_rewrite, mod_headers).
+# ==========================================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+ServerSignature Off
+
+AddType application/manifest+json .webmanifest
+AddType font/woff2 .woff2
+AddType font/woff .woff
+AddType image/webp .webp
+AddType image/avif .avif
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 1. HTTPS (set WEX_ALLOW_HTTP=1 in the vhost only for local smoke tests)
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteCond %{ENV:WEX_ALLOW_HTTP} !=1
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+    # 2. Never serve the core, dotfiles (except ACME), or sensitive file types
+    RewriteRule ^__WEX_CORE_DIR__(/|$) - [F,L]
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule \.(?:sql|sqlite3?|db|log|env|bak|ini|lock|md|sh|dist|yml|yaml|zip|gz|tar)$ - [F,L,NC]
+    RewriteRule (^|/)(?:composer\.(?:json|lock)|package(?:-lock)?\.json|spark|phpunit[^/]*|MANIFEST\.txt)$ - [F,L,NC]
+
+    # 3. API → front controller (keeps /api/v1/... intact)
+    RewriteCond %{REQUEST_URI} !^/api/index\.php$
+    RewriteRule ^api(?:/.*)?$ api/index.php [L,QSA]
+
+    # 4. Real files are served as-is
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # 5. Missing static assets are a real 404, not the SPA
+    RewriteRule ^(?:assets|uploads|icons|fonts)/ - [R=404,L]
+
+    # 6. Everything else is an SPA route (deep links like /admin/products, /products/slug)
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" "expr=%{HTTPS} == 'on'"
+
+    # App shell & service worker must revalidate on every load (deploys reach users)
+    <FilesMatch "^(?:index\.html|sw\.js|registerSW\.js|manifest\.webmanifest)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+    <FilesMatch "^sw\.js$">
+        Header set Service-Worker-Allowed "/"
+    </FilesMatch>
+    # Content-hashed build output is immutable
+    <If "%{REQUEST_URI} =~ m#^/assets/#">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+
+    # CSP for the web app (the API sends its own default-src 'none').
+    # Google Identity Services + push (VAPID uses the browser push service, no CSP needed).
+    <FilesMatch "^index\.html$">
+        Header set Content-Security-Policy "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self' data:; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; object-src 'none'"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript application/json application/manifest+json image/svg+xml
+</IfModule>

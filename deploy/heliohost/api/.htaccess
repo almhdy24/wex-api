@@ -1,0 +1,3 @@
+# Only index.php lives here; the root .htaccess routes /api/* to it.
+Options -Indexes
+DirectoryIndex index.php

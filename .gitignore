@@ -64,3 +64,8 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# Runtime state (cron runner / installer)
+writable/cron.lock
+writable/cron_state.json
+writable/install.lock

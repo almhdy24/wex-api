@@ -1,0 +1,115 @@
+name: Deploy package (HelioHost layout) + smoke test
+
+on:
+  push:
+    branches: [ stabilize, main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-and-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: wex
+          MARIADB_USER: wex
+          MARIADB_PASSWORD: wexpass
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mariadb-admin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      CORE: _wex_core
+      CRON_TOKEN: smoke-cron-token-0123456789abcdef0123456789abcdef
+      INSTALL_TOKEN: smoke-install-token-0123456789abcdef0123456789ab
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: wex-api }
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/wex-web
+          ref: stabilize
+          path: wex-web
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl, gd, mysqli, sqlite3
+          tools: composer
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: wex-web/package-lock.json
+
+      - name: Build package
+        id: pkg
+        working-directory: wex-api
+        run: |
+          VERSION="${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
+          scripts/package-deploy.sh ../wex-web "$VERSION" "$CORE"
+          echo "zip=build/wex-deploy-$VERSION.zip" >> "$GITHUB_OUTPUT"
+          echo "name=wex-deploy-$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pkg.outputs.name }}
+          path: wex-api/${{ steps.pkg.outputs.zip }}
+          retention-days: 30
+
+      - name: Install package into Apache (php:8.3-apache, AllowOverride All)
+        run: |
+          mkdir -p /tmp/site && unzip -q "wex-api/${{ steps.pkg.outputs.zip }}" -d /tmp/site
+          cp /tmp/site/$CORE/.env.example /tmp/site/$CORE/.env
+          sed -i \
+            -e "s|^app.baseURL = .*|app.baseURL = 'http://127.0.0.1/'|" \
+            -e "s|^database.default.hostname = .*|database.default.hostname = 127.0.0.1|" \
+            -e "s|^database.default.database =.*|database.default.database = wex|" \
+            -e "s|^database.default.username =.*|database.default.username = wex|" \
+            -e "s|^database.default.password =.*|database.default.password = wexpass|" \
+            -e "s|^encryption.key =.*|encryption.key = hex2bin:$(openssl rand -hex 32)|" \
+            -e "s|^JWT_SECRET =.*|JWT_SECRET = $(openssl rand -hex 32)|" \
+            -e "s|^MAIL_DRIVER = .*|MAIL_DRIVER = log|" \
+            -e "s|^PUSH_PROVIDER = .*|PUSH_PROVIDER = fake|" \
+            -e "s|^CRON_TOKEN =.*|CRON_TOKEN = $CRON_TOKEN|" \
+            -e "s|^INSTALL_TOKEN =.*|INSTALL_TOKEN = $INSTALL_TOKEN|" \
+            /tmp/site/$CORE/.env
+          chmod -R 777 /tmp/site/$CORE/writable /tmp/site/uploads
+          cat > /tmp/Dockerfile <<'DOCKER'
+          FROM php:8.3-apache
+          RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpng-dev libjpeg-dev libwebp-dev \
+           && docker-php-ext-configure gd --with-jpeg --with-webp \
+           && docker-php-ext-install -j"$(nproc)" intl gd mysqli \
+           && a2enmod rewrite headers deflate \
+           && sed -ri 's#AllowOverride None#AllowOverride All#g' /etc/apache2/apache2.conf \
+           && echo 'SetEnvIf Request_URI ".*" WEX_ALLOW_HTTP=1' > /etc/apache2/conf-enabled/wex-smoke.conf
+          DOCKER
+          docker build -q -t wex-apache /tmp
+          docker run -d --name wex --network host -v /tmp/site:/var/www/html wex-apache
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1/ && break; sleep 1; done
+
+      - name: First-time setup through the web installer, then seed a demo catalog
+        run: |
+          curl -sf -X POST -H 'X-Forwarded-Proto: https' -H "X-Install-Token: $INSTALL_TOKEN" -H 'Content-Type: application/json' \
+            -d '{"admin_email":"owner@smoke.test","admin_name":"صاحب المتجر"}' http://127.0.0.1/api/v1/internal/install | tee /tmp/install.json
+          test "$(jq -r .success /tmp/install.json)" = "true"
+          docker exec -e CI_ENVIRONMENT=development wex php /var/www/html/$CORE/spark db:seed DatabaseSeeder
+          docker exec wex php -r '$d=new mysqli("127.0.0.1","wex","wexpass","wex"); $d->query("UPDATE products SET stock_quantity=50");'
+
+      - name: Smoke test (security, SPA deep links, caching, auth boundaries)
+        working-directory: wex-api
+        run: scripts/smoke-deploy.sh http://127.0.0.1 wex "$CORE"
+
+      - name: Apache / app logs on failure
+        if: failure()
+        run: |
+          docker logs wex 2>&1 | tail -80 || true
+          cat /tmp/site/$CORE/writable/logs/*.log 2>/dev/null | tail -80 || true
