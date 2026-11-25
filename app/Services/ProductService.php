@@ -164,9 +164,12 @@ class ProductService
         $rateUpdatedAt = $this->pricingService->getRateUpdatedAt();
         $lowThreshold  = $this->getLowStockThreshold();
 
+        // One query for all primary images instead of one per product (N+1).
+        $imagesByProduct = $this->primaryImagesFor(array_map(static fn ($p) => (int) $p->id, $products));
+
         $items = [];
         foreach ($products as $prod) {
-            $items[] = $this->formatProductListItem($prod, $rateSdg, $rateUpdatedAt, $lowThreshold);
+            $items[] = $this->formatProductListItem($prod, $rateSdg, $rateUpdatedAt, $lowThreshold, $imagesByProduct);
         }
 
         return [
@@ -248,14 +251,38 @@ class ProductService
     /**
      * Formats a single product for catalog list views.
      */
-    protected function formatProductListItem(Product $prod, int $rateSdg, string $rateUpdatedAt, int $lowThreshold): array
+    /**
+     * Primary (else first by sort order) image per product, in a single query.
+     *
+     * @param list<int> $productIds
+     * @return array<int, object>
+     */
+    protected function primaryImagesFor(array $productIds): array
     {
-        // Get primary or first image
-        $primaryImage = $this->imageModel
-            ->where('product_id', $prod->id)
+        if ($productIds === []) {
+            return [];
+        }
+        $rows = $this->imageModel
+            ->whereIn('product_id', $productIds)
+            ->orderBy('product_id', 'ASC')
             ->orderBy('is_primary', 'DESC')
             ->orderBy('sort_order', 'ASC')
-            ->first();
+            ->orderBy('id', 'ASC')
+            ->findAll();
+        $out = [];
+        foreach ($rows as $img) {
+            $out[(int) $img->product_id] ??= $img;
+        }
+
+        return $out;
+    }
+
+    protected function formatProductListItem(Product $prod, int $rateSdg, string $rateUpdatedAt, int $lowThreshold, ?array $imagesByProduct = null): array
+    {
+        // Get primary or first image (preloaded for lists; single query otherwise)
+        $primaryImage = $imagesByProduct !== null
+            ? ($imagesByProduct[(int) $prod->id] ?? null)
+            : ($this->primaryImagesFor([(int) $prod->id])[(int) $prod->id] ?? null);
 
         return [
             'id'                => (int) $prod->id,
