@@ -1357,18 +1357,35 @@ class OrderService
     }
 
     /**
+     * Vowel-free, unambiguous alphabet (no 0/O/1/I/L): random suffixes can never spell
+     * words, and never "AED" (hex suffixes did, leaking the internal currency to customers).
+     */
+    public const ORDER_SUFFIX_ALPHABET = '23456789BCFGHJKMNPQRSTVWXYZ';
+
+    /**
      * Generate unique readable order number: WEX-YYMMDD-XXXXX
      */
     protected function generateOrderNumber(): string
     {
         $prefix = 'WEX-' . gmdate('ymd') . '-';
         for ($i = 0; $i < 5; $i++) {
-            $suffix = strtoupper(substr(bin2hex(random_bytes(3)), 0, 5));
-            $candidate = $prefix . $suffix;
+            $candidate = $prefix . self::randomSuffix(5);
             if (!$this->orders->where('order_number', $candidate)->first()) {
                 return $candidate;
             }
         }
-        return $prefix . strtoupper(bin2hex(random_bytes(4)));
+        return $prefix . self::randomSuffix(8);
+    }
+
+    public static function randomSuffix(int $length): string
+    {
+        $alphabet = self::ORDER_SUFFIX_ALPHABET;
+        $max      = strlen($alphabet) - 1;
+        $out      = '';
+        for ($i = 0; $i < $length; $i++) {
+            $out .= $alphabet[random_int(0, $max)];
+        }
+
+        return $out;
     }
 }
