@@ -13,14 +13,38 @@ concurrency:
 
 jobs:
   phpunit:
+    name: PHPUnit (${{ matrix.db }}, PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3']
+        db: [sqlite, mysql8, mariadb106]
+    services:
+      mysql:
+        # Only the matching DB is started; the sqlite leg gets a harmless MariaDB it ignores.
+        image: ${{ matrix.db == 'mysql8' && 'mysql:8.0' || 'mariadb:10.6' }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wex_tests
+          MYSQL_USER: wex
+          MYSQL_PASSWORD: wex
+          MARIADB_ROOT_PASSWORD: root
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot || mariadb-admin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      # Applied only for the MySQL-family legs (see the step below); phpunit.dist.xml <env>
+      # entries do not override variables that are already set.
+      DB_HOST: 127.0.0.1
     steps:
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: sqlite3, pdo_sqlite, mbstring, intl, json, gd
+          php-version: ${{ matrix.php }}
+          extensions: sqlite3, pdo_sqlite, mysqli, mbstring, intl, json, gd
           coverage: none
 
       - name: Install dependencies
@@ -36,10 +60,27 @@ jobs:
           mkdir -p writable/database writable/uploads writable/cache writable/logs writable/session
           chmod -R 777 writable
 
-      - name: Run full PHPUnit suite
+      - name: Run full PHPUnit suite (SQLite)
+        if: matrix.db == 'sqlite'
+        run: vendor/bin/phpunit -c phpunit.dist.xml
+
+      - name: Run full PHPUnit suite (${{ matrix.db }}, strict SQL mode, utf8mb4)
+        if: matrix.db != 'sqlite'
+        env:
+          database.tests.DBDriver: MySQLi
+          database.tests.hostname: 127.0.0.1
+          database.tests.database: wex_tests
+          database.tests.username: wex
+          database.tests.password: wex
+          database.tests.port: '3306'
+          database.tests.DBPrefix: ''
+          database.tests.charset: utf8mb4
+          database.tests.DBCollat: utf8mb4_unicode_ci
+          database.tests.strictOn: 'true'
         run: vendor/bin/phpunit -c phpunit.dist.xml
 
       - name: Migration down/up round-trip (SQLite)
+        if: matrix.db == 'sqlite'
         run: |
           printf 'CI_ENVIRONMENT=development\ndatabase.default.DBDriver=SQLite3\ndatabase.default.database=roundtrip.sqlite\n' > .env
           php spark migrate --all
