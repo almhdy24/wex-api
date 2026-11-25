@@ -48,11 +48,12 @@ class InternalController extends BaseApiController
         if (!$installer->isEnabled()) {
             return $this->respondError(lang('Api.route_not_found'), 404);
         }
-        if ($installer->isLocked()) {
-            return $this->respondError('تم التثبيت مسبقاً. احذف INSTALL_TOKEN من ملف .env.', 410);
-        }
+        // Token first: callers without the secret learn nothing (not even whether it is installed).
         if (!$installer->tokenIsValid($this->request->getHeaderLine('X-Install-Token'))) {
             return $this->respondError('رمز التثبيت غير صحيح.', 403);
+        }
+        if ($installer->isLocked()) {
+            return $this->respondError('تم التثبيت مسبقاً. احذف INSTALL_TOKEN من ملف .env.', 410);
         }
 
         $body = $this->getJsonBody();

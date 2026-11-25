@@ -70,7 +70,7 @@ jobs:
           mkdir -p /tmp/site && unzip -q "wex-api/${{ steps.pkg.outputs.zip }}" -d /tmp/site
           cp /tmp/site/$CORE/.env.example /tmp/site/$CORE/.env
           sed -i \
-            -e "s|^app.baseURL = .*|app.baseURL = 'http://127.0.0.1/'|" \
+            -e "s|^app.baseURL = .*|app.baseURL = 'https://127.0.0.1/'|" \
             -e "s|^database.default.hostname = .*|database.default.hostname = 127.0.0.1|" \
             -e "s|^database.default.database =.*|database.default.database = wex|" \
             -e "s|^database.default.username =.*|database.default.username = wex|" \
@@ -89,24 +89,26 @@ jobs:
            && docker-php-ext-configure gd --with-jpeg --with-webp \
            && docker-php-ext-install -j"$(nproc)" intl gd mysqli \
            && a2enmod rewrite headers deflate \
-           && sed -ri 's#AllowOverride None#AllowOverride All#g' /etc/apache2/apache2.conf \
-           && echo 'SetEnvIf Request_URI ".*" WEX_ALLOW_HTTP=1' > /etc/apache2/conf-enabled/wex-smoke.conf
+           && a2enmod ssl && a2ensite default-ssl \
+           && openssl req -x509 -nodes -days 2 -newkey rsa:2048 -subj "/CN=127.0.0.1" \
+                -keyout /etc/ssl/private/ssl-cert-snakeoil.key -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
+           && sed -ri 's#AllowOverride None#AllowOverride All#g' /etc/apache2/apache2.conf
           DOCKER
           docker build -q -t wex-apache /tmp
           docker run -d --name wex --network host -v /tmp/site:/var/www/html wex-apache
-          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1/ && break; sleep 1; done
+          for i in $(seq 1 30); do curl -sk -o /dev/null https://127.0.0.1/ && break; sleep 1; done
 
       - name: First-time setup through the web installer, then seed a demo catalog
         run: |
-          curl -sf -X POST -H 'X-Forwarded-Proto: https' -H "X-Install-Token: $INSTALL_TOKEN" -H 'Content-Type: application/json' \
-            -d '{"admin_email":"owner@smoke.test","admin_name":"صاحب المتجر"}' http://127.0.0.1/api/v1/internal/install | tee /tmp/install.json
+          curl -sfk -X POST -H "X-Install-Token: $INSTALL_TOKEN" -H 'Content-Type: application/json' \
+            -d '{"admin_email":"owner@smoke.test","admin_name":"صاحب المتجر"}' https://127.0.0.1/api/v1/internal/install | tee /tmp/install.json
           test "$(jq -r .success /tmp/install.json)" = "true"
           docker exec -e CI_ENVIRONMENT=development wex php /var/www/html/$CORE/spark db:seed DatabaseSeeder
           docker exec wex php -r '$d=new mysqli("127.0.0.1","wex","wexpass","wex"); $d->query("UPDATE products SET stock_quantity=50");'
 
       - name: Smoke test (security, SPA deep links, caching, auth boundaries)
         working-directory: wex-api
-        run: scripts/smoke-deploy.sh http://127.0.0.1 wex "$CORE"
+        run: scripts/smoke-deploy.sh https://127.0.0.1 wex "$CORE"
 
       - name: Apache / app logs on failure
         if: failure()

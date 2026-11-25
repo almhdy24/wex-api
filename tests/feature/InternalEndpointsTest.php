@@ -135,6 +135,8 @@ final class InternalEndpointsTest extends CIUnitTestCase
 
         $this->withHeaders(['X-Install-Token' => self::INST])->withBodyFormat('json')
             ->post('api/v1/internal/install', ['admin_email' => 'second@wex.sd'])->assertStatus(410);
+        // without the token the install state is not revealed
+        $this->withHeaders([])->withBodyFormat('json')->post('api/v1/internal/install', ['admin_email' => 'second@wex.sd'])->assertStatus(403);
         $this->assertNull((new UserModel())->where('email', 'second@wex.sd')->first());
     }
 }
