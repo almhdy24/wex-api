@@ -28,6 +28,9 @@ class ClaimsScanTest extends CIUnitTestCase
         '2849102',
         'WEX-DBG',
         'فاتورة',
+        'أصلي',          // unverifiable authenticity claim
+        'الأكثر طلب',    // popularity claim without data
+        'الأكثر مبيع',
     ];
 
     public function testSeedsAndTemplatesContainZeroForbiddenClaims(): void

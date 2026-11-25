@@ -254,7 +254,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
             ],
             [
                 'title'        => 'ملحقات ومستلزمات تقنية أساسية مع كل جهاز',
-                'subtitle'     => 'حقائب، شواحن أصلية، ومحولات متوافقة بأسعار مدروسة',
+                'subtitle'     => 'حقائب وشواحن ومحولات متوافقة مع جهازك',
                 'image'        => '/assets/hero/hero-3.webp',
                 'button_label' => 'الملحقات',
                 'link'         => '/catalog?type=accessory',

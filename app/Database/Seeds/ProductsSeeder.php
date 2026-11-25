@@ -266,7 +266,7 @@ class ProductsSeeder extends Seeder
                 ], JSON_UNESCAPED_UNICODE),
             ],
             [
-                'name'              => 'شاحن لابتوب أصلي 65 واط',
+                'name'              => 'شاحن لابتوب 65 واط',
                 'slug'              => 'original-laptop-charger-65w',
                 'type'              => Wex::PRODUCT_TYPE_ACCESSORY,
                 'category_id'       => $accessoriesCategory,
@@ -278,7 +278,7 @@ class ProductsSeeder extends Seeder
                 'is_featured'       => 0,
                 'warranty_text'     => null,
                 'short_description' => 'شاحن بديل عالي الجودة مع كابل الكهرباء',
-                'description'       => 'شاحن أصلي لحماية بطارية الجهاز من تذبذب التيار.',
+                'description'       => 'شاحن بقدرة 65 واط متوافق مع أغلب أجهزة اللابتوب ذات المنفذ المطابق.',
                 'specs'             => json_encode([
                     'power'  => '65 Watt',
                     'output' => '19.5V / 3.34A',
@@ -316,7 +316,7 @@ class ProductsSeeder extends Seeder
                 'is_featured'       => 0,
                 'warranty_text'     => null,
                 'short_description' => 'رام لتحسين استجابة الجهاز وتعدد المهام',
-                'description'       => 'شريحة رام أصلية لرفع كفاءة اللابتوب وسلاسة فتح البرامج المتزامنة.',
+                'description'       => 'شريحة ذاكرة عشوائية لزيادة سعة الذاكرة في اللابتوب.',
                 'specs'             => json_encode([
                     'capacity' => '8 GB',
                     'speed'    => 'DDR4 2666 MHz',
