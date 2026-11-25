@@ -211,12 +211,13 @@ final class OrderIntegrityTest extends CIUnitTestCase
     {
         $key = 'chk_' . bin2hex(random_bytes(8));
 
+        // Decode each body immediately: FeatureTestTrait responses share one Response object.
         $first = $this->postOrder($key);
         $first->assertStatus(201);
+        $a = json_decode($first->getJSON(), true)['data']['order_number'];
+
         $second = $this->postOrder($key);
         $second->assertStatus(201);
-
-        $a = json_decode($first->getJSON(), true)['data']['order_number'];
         $b = json_decode($second->getJSON(), true)['data']['order_number'];
         $this->assertSame($a, $b);
         $this->assertSame(4, $this->stock(), 'Stock must be reserved once');
