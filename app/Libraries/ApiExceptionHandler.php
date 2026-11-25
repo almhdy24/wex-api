@@ -89,6 +89,17 @@ class ApiExceptionHandler implements ExceptionHandlerInterface
         );
 
         $response->setJSON($payload);
+
+        // After-filters do not run for responses produced here, so apply the same CORS and
+        // security headers explicitly (otherwise cross-origin clients see an opaque failure
+        // and error pages lose nosniff/frame/CSP protection).
+        try {
+            (new \App\Filters\CorsFilter())->after($request, $response);
+            (new \App\Filters\SecurityHeadersFilter())->after($request, $response);
+        } catch (\Throwable) {
+            // never let header decoration mask the original error
+        }
+
         $response->send();
 
         if (ENVIRONMENT !== 'testing') {
