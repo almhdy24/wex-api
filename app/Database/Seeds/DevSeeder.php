@@ -129,12 +129,12 @@ class DevSeeder extends Seeder
             ]);
         }
 
-        // Ensure receipt sample proof image exists
+        // Ensure receipt proof image exists
         $proofDir = WRITEPATH . 'uploads/proofs';
         if (!is_dir($proofDir)) {
             mkdir($proofDir, 0700, true);
         }
-        $proofPath = $proofDir . '/sample-receipt.jpg';
+        $proofPath = $proofDir . '/receipt-bok-1001.jpg';
         if (!file_exists($proofPath)) {
             $img = imagecreatetruecolor(600, 800);
             $bg = imagecolorallocate($img, 245, 247, 250);
@@ -186,7 +186,7 @@ class DevSeeder extends Seeder
                 ],
                 'proof'           => [
                     'status'           => 'pending',
-                    'file_path'        => 'uploads/proofs/sample-receipt.jpg',
+                    'file_path'        => 'uploads/proofs/receipt-bok-1001.jpg',
                     'sender_name'      => 'عمر محمد أحمد',
                     'reference_number' => 'BOK-9847120',
                     'reviewed_by'      => null,
@@ -253,7 +253,7 @@ class DevSeeder extends Seeder
                 ],
                 'proof'           => [
                     'status'           => 'approved',
-                    'file_path'        => 'uploads/proofs/sample-receipt.jpg',
+                    'file_path'        => 'uploads/proofs/receipt-bok-1001.jpg',
                     'sender_name'      => 'عمر محمد أحمد',
                     'reference_number' => 'BOK-8723419',
                     'reviewed_by'      => $adminId,
@@ -304,7 +304,7 @@ class DevSeeder extends Seeder
                 ],
                 'proof'           => [
                     'status'           => 'approved',
-                    'file_path'        => 'uploads/proofs/sample-receipt.jpg',
+                    'file_path'        => 'uploads/proofs/receipt-bok-1001.jpg',
                     'sender_name'      => 'عمر محمد أحمد',
                     'reference_number' => 'OCASH-541298',
                     'reviewed_by'      => $adminId,
@@ -364,7 +364,7 @@ class DevSeeder extends Seeder
                 ],
                 'proof'           => [
                     'status'           => 'approved',
-                    'file_path'        => 'uploads/proofs/sample-receipt.jpg',
+                    'file_path'        => 'uploads/proofs/receipt-bok-1001.jpg',
                     'sender_name'      => 'عمر محمد أحمد',
                     'reference_number' => 'BOK-1122334',
                     'reviewed_by'      => $adminId,
@@ -424,7 +424,7 @@ class DevSeeder extends Seeder
                 ],
                 'proof'           => [
                     'status'           => 'approved',
-                    'file_path'        => 'uploads/proofs/sample-receipt.jpg',
+                    'file_path'        => 'uploads/proofs/receipt-bok-1001.jpg',
                     'sender_name'      => 'عمر محمد أحمد',
                     'reference_number' => 'BOK-9988776',
                     'reviewed_by'      => $adminId,

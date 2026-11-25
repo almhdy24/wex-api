@@ -60,7 +60,7 @@ foreach ($details as $row) {
 // Watermark seal at bottom
 imagestring($img, 2, 60, $height - 70, 'OFFICIAL ELECTRONIC RECEIPT - BANK OF KHARTOUM', $slate);
 
-imagejpeg($img, "$dir/sample-receipt.jpg", 90);
+imagejpeg($img, "$dir/receipt-bok-1001.jpg", 90);
 imagedestroy($img);
 
-echo "Sample receipt created at: $dir/sample-receipt.jpg\n";
+echo "Receipt created at: $dir/receipt-bok-1001.jpg\n";
