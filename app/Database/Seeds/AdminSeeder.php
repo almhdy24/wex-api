@@ -25,7 +25,7 @@ class AdminSeeder extends Seeder
             $this->db->table('users')->insert([
                 'name'                => 'مدير النظام',
                 'email'               => $adminEmail,
-                'phone'               => '+249912345678',
+                'phone'               => null,
                 'role'                => Wex::ROLE_ADMIN,
                 'email_verified_at'   => $now,
                 'email_notifications' => 1,

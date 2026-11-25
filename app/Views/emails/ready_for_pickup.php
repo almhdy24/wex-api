@@ -14,10 +14,12 @@
         <td class="label">ساعات العمل:</td>
         <td class="value">من 10 صباحاً حتى 10 مساءً (عدا الجمعة)</td>
     </tr>
+    <?php if (!empty($shop_phone)): // never show a placeholder number to customers ?>
     <tr>
         <td class="label">هاتف المحل:</td>
-        <td class="value"><?= esc($shop_phone ?? '+249 9XX XXX XXX') ?></td>
+        <td class="value" dir="ltr"><?= esc($shop_phone) ?></td>
     </tr>
+    <?php endif; ?>
 </table>
 
 <p style="font-size: 13px; color: #555;">يرجى إبراز رقم الطلب (<?= esc($order_number) ?>) لموظف المبيعات عند الحضور.</p>

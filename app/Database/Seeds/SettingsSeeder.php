@@ -19,8 +19,8 @@ class SettingsSeeder extends Seeder
             ['key' => 'low_stock_threshold',     'value' => '2'],
             ['key' => 'shop_name',               'value' => 'Wex Technology (ويكس تكنولوجي)'],
             ['key' => 'shop_address',            'value' => 'مول الواحة، الشهداء، أم درمان'],
-            ['key' => 'shop_phone',              'value' => '+249 9XX XXX XXX'],
-            ['key' => 'shop_whatsapp',           'value' => '249912345678'],
+            ['key' => 'shop_phone',              'value' => ''], // set the real number in admin settings
+            ['key' => 'shop_whatsapp',           'value' => ''], // never seed a placeholder: it is shown to customers
             ['key' => 'working_hours',           'value' => 'من 10 صباحاً إلى 10 مساءً، عدا الجمعة'],
             ['key' => 'push_enabled',            'value' => '1'],
         ];
