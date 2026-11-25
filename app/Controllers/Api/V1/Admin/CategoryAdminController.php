@@ -47,12 +47,14 @@ class CategoryAdminController extends BaseApiController
             ? preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower(trim($body['slug'])))
             : preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower(trim($body['name_ar'])));
 
+        $slug = $this->assertSlugAvailable(trim((string) $slug, '-'));
+
         $now = gmdate('Y-m-d H:i:s');
 
         $id = $this->categoryModel->insert([
             'name_ar'    => trim($body['name_ar']),
             'name_en'    => $body['name_en'] ?? null,
-            'slug'       => trim($slug, '-'),
+            'slug'       => $slug,
             'sort_order' => isset($body['sort_order']) ? (int) $body['sort_order'] : 0,
             'is_active'  => isset($body['is_active']) ? (int) \App\Libraries\Input::bool($body['is_active']) : 1,
             'created_at' => $now,
@@ -60,6 +62,9 @@ class CategoryAdminController extends BaseApiController
         ]);
 
         $category = $this->categoryModel->find($id);
+
+        \App\Libraries\AdminAudit::log($this->request, $this->currentUser(), 'category_created', 'category', (int) $id, ['after' => $category->toArray()]);
+
 
         return $this->respondCreated($category, lang('Api.category_created'));
     }
@@ -92,17 +97,22 @@ class CategoryAdminController extends BaseApiController
 
         foreach (['name_ar', 'name_en', 'sort_order', 'is_active'] as $key) {
             if (array_key_exists($key, $body)) {
-                $updateFields[$key] = $body[$key];
+                $updateFields[$key] = match ($key) {
+                    'is_active'  => (int) \App\Libraries\Input::bool($body[$key]),
+                    'sort_order' => (int) $body[$key],
+                    default      => $body[$key],
+                };
             }
         }
 
         if (isset($body['slug'])) {
-            $updateFields['slug'] = trim(preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower($body['slug'])), '-');
+            $updateFields['slug'] = $this->assertSlugAvailable(trim(preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower((string) $body['slug'])), '-'), $id);
         }
 
         if (!empty($updateFields)) {
             $updateFields['updated_at'] = gmdate('Y-m-d H:i:s');
             $this->categoryModel->update($id, $updateFields);
+            \App\Libraries\AdminAudit::log($this->request, $this->currentUser(), 'category_updated', 'category', $id, ['changes' => $updateFields]);
             $category = $this->categoryModel->find($id);
         }
 
@@ -119,8 +129,35 @@ class CategoryAdminController extends BaseApiController
             throw new NotFoundException('الفئة غير موجودة');
         }
 
+        // products.category_id is ON DELETE RESTRICT (also enforced on SQLite): deleting a
+        // category that still has products (soft-deleted ones included) raised a DB error (500).
+        $inUse = (new \App\Models\ProductModel())->withDeleted()->where('category_id', $id)->countAllResults();
+        if ($inUse > 0) {
+            throw new \App\Exceptions\ConflictException('لا يمكن حذف الفئة لوجود منتجات مرتبطة بها، انقل المنتجات إلى فئة أخرى أولاً.');
+        }
+
         $this->categoryModel->delete($id);
+        \App\Libraries\AdminAudit::log($this->request, $this->currentUser(), 'category_deleted', 'category', $id, ['before' => $category->toArray()]);
 
         return $this->respondSuccess(null, lang('Api.category_deleted'));
+    }
+
+    /**
+     * slug is UNIQUE in the schema: a duplicate or empty slug used to surface as a 500.
+     */
+    private function assertSlugAvailable(string $slug, ?int $ignoreId = null): string
+    {
+        if ($slug === '') {
+            throw new ValidationFailedException(['slug' => 'معرف الرابط (slug) غير صالح']);
+        }
+        $builder = $this->categoryModel->where('slug', $slug);
+        if ($ignoreId !== null) {
+            $builder->where('id !=', $ignoreId);
+        }
+        if ($builder->countAllResults() > 0) {
+            throw new ValidationFailedException(['slug' => 'معرف الرابط مستخدم بالفعل لـالفئة أخرى']);
+        }
+
+        return $slug;
     }
 }

@@ -47,17 +47,22 @@ class BrandAdminController extends BaseApiController
             ? preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower(trim($body['slug'])))
             : preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower(trim($body['name'])));
 
+        $slug = $this->assertSlugAvailable(trim((string) $slug, '-'));
+
         $now = gmdate('Y-m-d H:i:s');
 
         $id = $this->brandModel->insert([
             'name'       => trim($body['name']),
-            'slug'       => trim($slug, '-'),
+            'slug'       => $slug,
             'is_active'  => isset($body['is_active']) ? (int) \App\Libraries\Input::bool($body['is_active']) : 1,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
         $brand = $this->brandModel->find($id);
+
+        \App\Libraries\AdminAudit::log($this->request, $this->currentUser(), 'brand_created', 'brand', (int) $id, ['after' => $brand->toArray()]);
+
 
         return $this->respondCreated($brand, lang('Api.brand_created'));
     }
@@ -90,17 +95,22 @@ class BrandAdminController extends BaseApiController
 
         foreach (['name', 'is_active'] as $key) {
             if (array_key_exists($key, $body)) {
-                $updateFields[$key] = $body[$key];
+                $updateFields[$key] = match ($key) {
+                    'is_active'  => (int) \App\Libraries\Input::bool($body[$key]),
+                    'sort_order' => (int) $body[$key],
+                    default      => $body[$key],
+                };
             }
         }
 
         if (isset($body['slug'])) {
-            $updateFields['slug'] = trim(preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower($body['slug'])), '-');
+            $updateFields['slug'] = $this->assertSlugAvailable(trim(preg_replace('/[^\p{L}\p{Nd}]+/u', '-', mb_strtolower((string) $body['slug'])), '-'), $id);
         }
 
         if (!empty($updateFields)) {
             $updateFields['updated_at'] = gmdate('Y-m-d H:i:s');
             $this->brandModel->update($id, $updateFields);
+            \App\Libraries\AdminAudit::log($this->request, $this->currentUser(), 'brand_updated', 'brand', $id, ['changes' => $updateFields]);
             $brand = $this->brandModel->find($id);
         }
 
@@ -118,7 +128,27 @@ class BrandAdminController extends BaseApiController
         }
 
         $this->brandModel->delete($id);
+        \App\Libraries\AdminAudit::log($this->request, $this->currentUser(), 'brand_deleted', 'brand', $id, ['before' => $brand->toArray()]);
 
         return $this->respondSuccess(null, lang('Api.brand_deleted'));
+    }
+
+    /**
+     * slug is UNIQUE in the schema: a duplicate or empty slug used to surface as a 500.
+     */
+    private function assertSlugAvailable(string $slug, ?int $ignoreId = null): string
+    {
+        if ($slug === '') {
+            throw new ValidationFailedException(['slug' => 'معرف الرابط (slug) غير صالح']);
+        }
+        $builder = $this->brandModel->where('slug', $slug);
+        if ($ignoreId !== null) {
+            $builder->where('id !=', $ignoreId);
+        }
+        if ($builder->countAllResults() > 0) {
+            throw new ValidationFailedException(['slug' => 'معرف الرابط مستخدم بالفعل لـالماركة أخرى']);
+        }
+
+        return $slug;
     }
 }
