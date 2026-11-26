@@ -328,6 +328,7 @@ class ProductService
                 'type'              => $acc->type,
                 'name'              => $acc->name,
                 'short_description' => $acc->short_description,
+                'condition'         => $acc->condition,
                 'price_sdg'         => $this->pricingService->convertAedToSdg((int) $acc->price_aed, $rateSdg),
                 'stock_status'      => $acc->getStockStatus($lowThreshold),
                 'image'             => $img ? [

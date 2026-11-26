@@ -95,6 +95,7 @@ class PublicProductPresenter
                     'type'              => (string) ($acc['type'] ?? ''),
                     'name'              => (string) ($acc['name'] ?? ''),
                     'short_description' => $acc['short_description'] ?? null,
+                    'condition'         => $acc['condition'] ?? null,
                     'price_sdg'         => (int) ($acc['price_sdg'] ?? 0),
                     'stock_status'      => (string) ($acc['stock_status'] ?? 'in_stock'),
                     'image'             => isset($acc['image']) && is_array($acc['image']) ? [

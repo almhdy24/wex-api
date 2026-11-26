@@ -84,6 +84,11 @@ final class CatalogTest extends CIUnitTestCase
 
         $this->assertIsArray($prod['accessories']);
         $this->assertCount(6, $prod['accessories']);
+        // Without condition the storefront labelled new accessories as used.
+        foreach ($prod['accessories'] as $acc) {
+            $this->assertArrayHasKey('condition', $acc);
+            $this->assertNotEmpty($acc['condition']);
+        }
 
         // Test fallback lookup by numeric id
         $idResult = $this->get('api/v1/products/' . $prod['id']);
