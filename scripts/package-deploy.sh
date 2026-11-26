@@ -31,6 +31,9 @@ rsync -a --delete \
   --exclude 'writable/*.sqlite' --exclude 'writable/database/*.sqlite' --exclude 'writable/logs/*' --exclude 'writable/cache/*' \
   --exclude 'writable/session/*' --exclude 'writable/uploads/*' --exclude 'writable/debugbar/*' \
   --exclude 'writable/*.lock' --exclude 'writable/cron_state.json' \
+  --exclude 'app/Database/Seeds/DevSeeder.php' --exclude 'app/Database/Seeds/AdminSeeder.php' \
+  --exclude 'app/Database/Seeds/DatabaseSeeder.php' --exclude 'app/Database/Seeds/SettingsSeeder.php' \
+  --exclude 'writable/database/*' --exclude 'writable/uploads/*' --exclude 'public/uploads/*' \
   "$API_DIR/" "$ROOT/$CORE/"
 ( cd "$ROOT/$CORE" && composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --quiet )
 mkdir -p "$ROOT/$CORE/writable/"{cache,logs,session,uploads/proofs,database}
@@ -67,6 +70,9 @@ SECRETS=$(grep -RHE "^(JWT_SECRET|encryption\.key|INSTALL_TOKEN|CRON_TOKEN|VAPID
   "$ROOT/$CORE" --include='.env*' 2>/dev/null || true)
 [ -n "$SECRETS" ] && { echo "$SECRETS" >&2; fail "secret value in a shipped env file"; }
 php -l "$ROOT/api/index.php" >/dev/null
+
+echo "==> verify-package (dev data, secrets, placeholders)"
+"$API_DIR/scripts/verify-package.sh" "$ROOT" "$CORE"
 
 echo "==> manifest + zip"
 ( cd "$ROOT" && find . -type f -not -name MANIFEST.txt | LC_ALL=C sort | xargs sha256sum > MANIFEST.txt )
