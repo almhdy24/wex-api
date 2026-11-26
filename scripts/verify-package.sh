@@ -37,12 +37,12 @@ fi
 # ---------------------------------------------------------------- 2. secrets
 SECRET_RE='-----BEGIN ([A-Z]+ )?PRIVATE KEY-----|"type"[[:space:]]*:[[:space:]]*"service_account"'
 while IFS= read -r f; do fail "private key / service account in: $f"; done < <(
-  grep -rlEI --exclude-dir=vendor "$SECRET_RE" . 2>/dev/null)
+  grep -rlEI --exclude-dir=vendor -e "$SECRET_RE" . 2>/dev/null)
 
 ENV_SECRET_RE='^[[:space:]]*(JWT_SECRET|encryption\.key|INSTALL_TOKEN|CRON_TOKEN|VAPID_PRIVATE_KEY|email\.SMTPPass|MAIL_SMTP_PASS|SMTP_PASS|database\.default\.password|GOOGLE_CLIENT_SECRET)[[:space:]]*=[[:space:]]*[^[:space:]#]'
 while IFS= read -r f; do
   fail "secret value in shipped env file: $f ($(grep -cE "$ENV_SECRET_RE" "$f") line(s))"
-done < <(find . -not -path "./$CORE/vendor/*" -name '.env*' -type f -exec grep -lE "$ENV_SECRET_RE" {} + 2>/dev/null)
+done < <(find . -not -path "./$CORE/vendor/*" -name '.env*' -type f -exec grep -lE -e "$ENV_SECRET_RE" {} + 2>/dev/null)
 
 # hard-coded long hex/base64 secrets assigned in PHP config (heuristic)
 while IFS= read -r hit; do fail "hard-coded secret-like value: $hit"; done < <(
@@ -57,7 +57,7 @@ ALLOW_RE='^$'
 while IFS= read -r hit; do
   [[ "$hit" =~ $ALLOW_RE ]] && continue
   fail "placeholder data: ${hit:0:200}"
-done < <(grep -rnoEI --exclude-dir=vendor --exclude='MANIFEST.txt' "$PLACEHOLDER_RE" . 2>/dev/null)
+done < <(grep -rnoEI --exclude-dir=vendor --exclude='MANIFEST.txt' -e "$PLACEHOLDER_RE" . 2>/dev/null)
 
 # ---------------------------------------------------------------- 4. layout sanity
 for f in index.html .htaccess api/index.php api/.htaccess "$CORE/.htaccess" uploads/.htaccess; do

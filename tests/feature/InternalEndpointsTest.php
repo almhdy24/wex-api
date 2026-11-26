@@ -45,6 +45,9 @@ final class InternalEndpointsTest extends CIUnitTestCase
         }
         @unlink(WRITEPATH . 'install.lock');
         @unlink(WRITEPATH . 'cron_state.json');
+        // This class shares one database with the classes after it (migrateOnce, no
+        // refresh); the installer closes orders, so reopen them for the order tests.
+        db_connect()->table('settings')->where('key', 'orders_enabled')->update(['value' => '1']);
         parent::tearDown();
     }
 
