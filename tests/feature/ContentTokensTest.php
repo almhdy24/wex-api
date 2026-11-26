@@ -57,6 +57,7 @@ final class ContentTokensTest extends CIUnitTestCase
         $this->assertStringNotContainsString('4 ساعات', $faq);
 
         $terms = json_decode($this->get('/api/v1/content/pages/terms')->getJSON(), true)['data']['body'];
+        $this->assertStringNotContainsString('ملاحظة للإدارة', $terms, 'internal admin note shown to customers');
         $this->assertStringContainsString('لمدة ساعة واحدة', $terms);
         $this->assertStringNotContainsString('4 ساعات', $terms);
 

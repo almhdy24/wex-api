@@ -52,8 +52,9 @@ while IFS= read -r hit; do fail "hard-coded secret-like value: $hit"; done < <(
 # ---------------------------------------------------------------- 3. placeholder contact data
 # Outside vendor/. The web bundle is scanned too; a bundled-library hit must be added to
 # ALLOW with the exact file + reason.
-PLACEHOLDER_RE='wextechnology\.com|example\.(com|org|net)|0123456789|0912345678|249912345678|مدير النظام \(CI\)|customer@wex\.sd|@wex\.sd|smoke\.test|mailto:support@wex\.sd'
-ALLOW_RE='^$'
+PLACEHOLDER_RE='wextechnology\.com|example\.(com|org|net)|0123456789|0912345678|249912345678|مدير النظام \(CI\)|customer@wex\.sd|@wex\.sd|smoke\.test|mailto:support@wex\.sd|wextech\.sd|ملاحظة للإدارة'
+# Migrations that REMOVE a placeholder must name it to find it.
+ALLOW_RE='/Database/Migrations/2026-11-26-00000[56]_[A-Za-z]+\.php:[0-9]+:ملاحظة للإدارة$'
 while IFS= read -r hit; do
   [[ "$hit" =~ $ALLOW_RE ]] && continue
   fail "placeholder data: ${hit:0:200}"
