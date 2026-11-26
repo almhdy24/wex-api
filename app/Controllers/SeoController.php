@@ -23,7 +23,7 @@ class SeoController extends BaseController
         return $this->response
             ->setStatusCode($out['status'])
             ->setContentType('text/html', 'UTF-8')
-            ->setHeader('Cache-Control', 'no-cache, must-revalidate')
+            ->removeHeader('Cache-Control')->setHeader('Cache-Control', 'no-cache, must-revalidate')
             ->setHeader('Content-Security-Policy', self::APP_CSP)
             ->setBody($out['html']);
     }
@@ -31,7 +31,7 @@ class SeoController extends BaseController
     public function sitemap(): ResponseInterface
     {
         return $this->response->setContentType('application/xml', 'UTF-8')
-            ->setHeader('Cache-Control', 'public, max-age=3600')
+            ->removeHeader('Cache-Control')->setHeader('Cache-Control', 'public, max-age=3600')
             ->setBody((new SeoService())->sitemap());
     }
 
@@ -40,6 +40,6 @@ class SeoController extends BaseController
         $base = (new SeoService())->baseUrl();
         $body = "User-agent: *\nDisallow: /admin\nDisallow: /api/\nDisallow: /account\nDisallow: /checkout\nDisallow: /orders\nDisallow: /cart\nAllow: /\n\nSitemap: {$base}/sitemap.xml\n";
 
-        return $this->response->setContentType('text/plain', 'UTF-8')->setHeader('Cache-Control', 'public, max-age=86400')->setBody($body);
+        return $this->response->setContentType('text/plain', 'UTF-8')->removeHeader('Cache-Control')->setHeader('Cache-Control', 'public, max-age=86400')->setBody($body);
     }
 }

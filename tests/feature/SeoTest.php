@@ -56,6 +56,16 @@ final class SeoTest extends CIUnitTestCase
         $this->assertStringContainsString("script-src 'self'", $res->response()->getHeaderLine('Content-Security-Policy'));
     }
 
+    /** HEAD must carry GET's caching policy (the security filter used to force no-store). */
+    public function testHeadKeepsTheShellCachePolicy(): void
+    {
+        $p = \Config\Database::connect()->table('products')->where('is_active', 1)->get(1)->getRow();
+        $get = $this->get('/products/' . $p->slug);
+        $head = $this->call('HEAD', '/products/' . $p->slug);
+        $this->assertStringStartsWith('no-cache', $get->response()->getHeaderLine('Cache-Control'));
+        $this->assertSame($get->response()->getHeaderLine('Cache-Control'), $head->response()->getHeaderLine('Cache-Control'));
+    }
+
     public function testValuesAreEscaped(): void
     {
         $db = \Config\Database::connect();

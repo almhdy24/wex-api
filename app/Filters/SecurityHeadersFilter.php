@@ -44,7 +44,9 @@ class SecurityHeadersFilter implements FilterInterface
         }
 
         // Prevent caching on authenticated or mutating responses
-        if ($request->hasHeader('Authorization') || strtoupper($request->getMethod()) !== 'GET') {
+        // HEAD is a safe method and must carry GET's headers (the deploy smoke test checks the
+        // app shell with HEAD and saw no-store instead of the shell's no-cache).
+        if ($request->hasHeader('Authorization') || !in_array(strtoupper($request->getMethod()), ['GET', 'HEAD'], true)) {
             $response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
             $response->setHeader('Pragma', 'no-cache');
         }
