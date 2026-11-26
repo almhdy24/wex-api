@@ -111,7 +111,10 @@ class AuthController extends BaseApiController
         }
 
         $body = $this->getJsonBody();
-        $email = !empty($body['email']) ? (string) $body['email'] : 'customer@wex.sd';
+        $email = trim((string) ($body['email'] ?? ''));
+        if ($email === '') {
+            return $this->respondError('البريد الإلكتروني مطلوب.', 422);
+        }
         $user = (new \App\Models\UserModel())->where('email', $email)->first();
         if (!$user) {
             return $this->respondError('المستخدم غير موجود', 404);
@@ -149,8 +152,7 @@ class AuthController extends BaseApiController
      */
     public static function testingLoginEnabled(): bool
     {
-        $env = strtolower((string) (getenv('CI_ENVIRONMENT') ?: ENVIRONMENT));
-        if ($env === 'production' || ENVIRONMENT === 'production') {
+        if (\App\Libraries\RuntimeEnv::isProduction()) {
             return false;
         }
 

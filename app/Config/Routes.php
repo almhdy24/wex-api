@@ -20,7 +20,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->post('google', 'AuthController::google', ['filter' => 'throttle:30,60,google_auth']);
         $routes->post('email/request', 'AuthController::requestEmailOtp', ['filter' => 'throttle:10,3600,otp_req']);
         $routes->post('email/verify', 'AuthController::verifyEmailOtp', ['filter' => 'throttle:10,600,otp_ver']);
-        $routes->post('testing-login', 'AuthController::testingLogin');
+        // Test-only: not even registered in production (the controller also refuses).
+        if (ENVIRONMENT !== 'production') {
+            $routes->post('testing-login', 'AuthController::testingLogin');
+        }
         $routes->post('refresh', 'AuthController::refresh');
         $routes->post('logout', 'AuthController::logout');
         $routes->post('logout-all', 'AuthController::logoutAll', ['filter' => 'auth']);
@@ -205,8 +208,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         $routes->get('push/stats', 'Admin\PushAdminController::stats', ['filter' => 'role:admin']);
         $routes->get('push/log', 'Admin\PushAdminController::log', ['filter' => 'role:admin']);
         $routes->put('push/settings', 'Admin\PushAdminController::updateSettings', ['filter' => 'role:admin']);
-        $routes->get('push/fake-log', 'Admin\PushAdminController::fakeLog', ['filter' => 'role:admin']);
-        $routes->delete('push/fake-log', 'Admin\PushAdminController::fakeLog', ['filter' => 'role:admin']);
+        if (ENVIRONMENT !== 'production') { // fake push provider log: test-only
+            $routes->get('push/fake-log', 'Admin\PushAdminController::fakeLog', ['filter' => 'role:admin']);
+            $routes->delete('push/fake-log', 'Admin\PushAdminController::fakeLog', ['filter' => 'role:admin']);
+        }
 
         // Exchange Rates (AED -> SDG) (Admin only)
         $routes->get('rates', 'Admin\RateAdminController::index', ['filter' => 'role:admin']);

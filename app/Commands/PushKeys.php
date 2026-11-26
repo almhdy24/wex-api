@@ -21,7 +21,7 @@ class PushKeys extends BaseCommand
         CLI::newLine();
         CLI::write('VAPID_PUBLIC_KEY="' . $keys['publicKey'] . '"', 'yellow');
         CLI::write('VAPID_PRIVATE_KEY="' . $keys['privateKey'] . '"', 'yellow');
-        CLI::write('VAPID_SUBJECT="mailto:support@wex.sd"', 'yellow');
+        CLI::write('VAPID_SUBJECT="mailto:<your shop email>"', 'yellow');
         CLI::newLine();
         CLI::write('Warning: Rotating VAPID keys invalidates all existing Web Push subscriptions.', 'red');
 

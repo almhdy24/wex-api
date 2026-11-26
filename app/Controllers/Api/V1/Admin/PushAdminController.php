@@ -102,8 +102,8 @@ class PushAdminController extends BaseApiController
      */
     public function fakeLog(): ResponseInterface
     {
-        $env = strtolower((string) (getenv('APP_ENV') ?: (defined('ENVIRONMENT') ? ENVIRONMENT : 'development')));
-        if ($env === 'production') {
+        // Was keyed on APP_ENV, which this app never sets.
+        if (\App\Libraries\RuntimeEnv::isProduction()) {
             return $this->respondError('غير متاح', 404);
         }
 

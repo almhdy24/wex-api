@@ -23,7 +23,7 @@ class MailService
     public function __construct(?EmailOutboxModel $outbox = null)
     {
         $this->driver    = env('MAIL_DRIVER', 'log');
-        $this->fromEmail = env('MAIL_FROM_EMAIL', 'noreply@wextechnology.com');
+        $this->fromEmail = \App\Libraries\SiteIdentity::fromEmail();
         $this->fromName  = env('MAIL_FROM_NAME', 'Wex Technology');
         $this->outbox    = $outbox ?? new EmailOutboxModel();
     }

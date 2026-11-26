@@ -21,7 +21,7 @@ class WebPushProvider implements PushProviderInterface
     ) {
         $this->publicKey  = $publicKey ?? (string) (env('VAPID_PUBLIC_KEY') ?: '');
         $this->privateKey = $privateKey ?? (string) (env('VAPID_PRIVATE_KEY') ?: '');
-        $this->subject    = $subject ?? (string) (env('VAPID_SUBJECT') ?: 'mailto:support@wex.sd');
+        $this->subject    = $subject ?? \App\Libraries\SiteIdentity::vapidSubject();
         $this->timeout    = $timeout;
     }
 

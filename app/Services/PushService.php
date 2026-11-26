@@ -55,7 +55,8 @@ class PushService
         $this->settings         = $settings ?? new SettingService();
         $this->overrideProvider = $overrideProvider;
 
-        if ($this->overrideProvider === null && strtolower((string) env('PUSH_PROVIDER')) === 'fake') {
+        // The fake provider swallows notifications: never in production, whatever .env says.
+        if ($this->overrideProvider === null && strtolower((string) env('PUSH_PROVIDER')) === 'fake' && !\App\Libraries\RuntimeEnv::isProduction()) {
             $this->overrideProvider = new FakeProvider();
         }
     }
