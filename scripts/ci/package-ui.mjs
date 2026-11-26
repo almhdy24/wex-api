@@ -26,12 +26,13 @@ for (const [vpName, width, height] of viewports) {
     const errors = [];
     page.on('console', (m) => {
       // A guest's session bootstrap gets 401 from /auth/refresh by design.
-      if (m.type() === 'error' && !/status of 401/.test(m.text())) errors.push(m.text());
+      // "Failed to load resource" duplicates the response listener below, which names the URL.
+      if (m.type() === 'error' && !/status of 401|Failed to load resource/.test(m.text())) errors.push(m.text());
     });
     page.on('pageerror', (e) => errors.push(e.message));
     // Name the URL behind every failed resource, so a "Failed to load resource" is actionable.
     page.on('response', (r) => {
-      if (r.status() >= 400 && r.status() !== 401) errors.push(`HTTP ${r.status()} ${r.url().replace(base, '')}`);
+      if (r.status() >= 400 && r.status() !== 401 && !r.request().isNavigationRequest()) errors.push(`HTTP ${r.status()} ${r.url().replace(base, '')}`);
     });
     try {
       const res = await page.goto(base + p, { waitUntil: 'networkidle', timeout: 30000 });
