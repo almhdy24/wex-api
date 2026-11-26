@@ -260,6 +260,11 @@ final class SettingsTest extends CIUnitTestCase
         $this->assertSame(5, $shop['app_discount_percent']);
         $this->assertSame(6, $shop['lock_hours']);
 
+        // Re-opening orders needs a complete setup (contact + active payment account).
+        $db->table('settings')->where('key', 'shop_whatsapp')->update(['value' => '0911000000']);
+        if ($db->table('payment_accounts')->where('is_active', 1)->countAllResults() === 0) {
+            $db->table('payment_accounts')->insert(['bank_name' => 'بنك', 'account_name' => 'المتجر', 'account_number' => '100', 'is_active' => 1, 'sort_order' => 1]);
+        }
         $patch(['orders_enabled' => true, 'ticker_enabled' => false])->assertStatus(200);
         $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
         $this->assertTrue($shop['orders_enabled']);

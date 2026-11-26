@@ -202,6 +202,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
         // Settings & Operational Configuration (Admin only)
         $routes->get('settings', 'Admin\SettingAdminController::index', ['filter' => 'role:admin']);
         $routes->patch('settings', 'Admin\SettingAdminController::update', ['filter' => 'role:admin']);
+        $routes->get('setup-status', 'Admin\SettingAdminController::setupStatus', ['filter' => 'role:admin']);
 
         // Push Notifications Admin (Admin only)
         $routes->post('push/broadcast', 'Admin\PushAdminController::broadcast', ['filter' => 'role:admin']);

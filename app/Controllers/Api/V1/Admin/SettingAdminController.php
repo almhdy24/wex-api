@@ -45,4 +45,12 @@ class SettingAdminController extends BaseApiController
 
         return $this->respondSuccess($updated, 'تم تحديث الإعدادات بنجاح');
     }
+
+    /**
+     * GET /api/v1/admin/setup-status: what the shop still needs before it can take orders.
+     */
+    public function setupStatus(): ResponseInterface
+    {
+        return $this->respondSuccess((new \App\Services\SetupStatusService())->status());
+    }
 }

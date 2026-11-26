@@ -139,4 +139,49 @@ final class InternalEndpointsTest extends CIUnitTestCase
         $this->withHeaders([])->withBodyFormat('json')->post('api/v1/internal/install', ['admin_email' => 'second@wex.sd'])->assertStatus(403);
         $this->assertNull((new UserModel())->where('email', 'second@wex.sd')->first());
     }
+
+    /** Fresh install: ordering closed, no catalogue added unless sample content is asked for. */
+    public function testInstallStartsClosedWithoutSampleContent(): void
+    {
+        $db = \Config\Database::connect();
+        $products = $db->table('products')->countAllResults();
+        $db->table('settings')->where('key', 'orders_enabled')->update(['value' => '1']);
+
+        $this->setEnv('INSTALL_TOKEN', self::INST);
+        $this->withHeaders(['X-Install-Token' => self::INST])->withBodyFormat('json')
+            ->post('api/v1/internal/install', ['admin_email' => 'fresh_' . bin2hex(random_bytes(3)) . '@shop.test'])
+            ->assertStatus(200);
+
+        $this->assertSame('0', $db->table('settings')->where('key', 'orders_enabled')->get()->getRow()->value);
+        $this->assertSame($products, $db->table('products')->countAllResults(), 'installer must not add products by default');
+        $this->assertSame(1, $db->table('categories')->where('slug', 'laptops')->countAllResults());
+    }
+
+    /** Orders cannot be opened while required setup items are missing; the checklist says what. */
+    public function testOrdersStayClosedUntilSetupComplete(): void
+    {
+        $db = \Config\Database::connect();
+        $admin = (new UserModel())->where('role', 'admin')->first();
+        $token = (new \App\Services\TokenService())->generateAccessToken($admin)['access_token'];
+        $auth = ['Authorization' => 'Bearer ' . $token];
+
+        $db->table('settings')->where('key', 'shop_phone')->update(['value' => '']);
+        $db->table('settings')->where('key', 'shop_whatsapp')->update(['value' => '']);
+        $db->table('payment_accounts')->update(['is_active' => 0]);
+
+        $status = json_decode($this->withHeaders($auth)->get('api/v1/admin/setup-status')->getJSON(), true)['data'];
+        $this->assertFalse($status['complete']);
+        $keys = array_column($status['missing'], 'key');
+        $this->assertContains('contact', $keys);
+        $this->assertContains('payment_account', $keys);
+
+        $res = $this->withHeaders($auth)->withBodyFormat('json')->patch('api/v1/admin/settings', ['orders_enabled' => true]);
+        $res->assertStatus(422);
+        $this->assertStringContainsString('أكمل إعداد المتجر', $res->getJSON());
+
+        $db->table('settings')->where('key', 'shop_whatsapp')->update(['value' => '0911000000']);
+        $db->table('payment_accounts')->update(['is_active' => 1]);
+        $this->assertTrue((new \App\Services\SetupStatusService())->status()['complete']);
+        $this->withHeaders($auth)->withBodyFormat('json')->patch('api/v1/admin/settings', ['orders_enabled' => true])->assertStatus(200);
+    }
 }

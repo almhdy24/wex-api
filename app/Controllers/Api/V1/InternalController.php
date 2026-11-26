@@ -59,7 +59,8 @@ class InternalController extends BaseApiController
         $body = $this->getJsonBody();
         $result = $installer->install(
             (string) ($body['admin_email'] ?? ''),
-            (string) ($body['admin_name'] ?? 'مدير المتجر')
+            (string) ($body['admin_name'] ?? 'مدير المتجر'),
+            \App\Libraries\Input::bool($body['sample_content'] ?? false)
         );
 
         return $this->respondSuccess($result, 'تم التثبيت بنجاح. احذف INSTALL_TOKEN من ملف .env الآن.');

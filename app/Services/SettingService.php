@@ -274,6 +274,15 @@ class SettingService
             }
         }
 
+        // Ordering cannot be opened before the shop is set up (fresh installs start closed).
+        if (($updates['orders_enabled'] ?? null) === '1') {
+            $setup = (new SetupStatusService())->status();
+            if (!$setup['complete']) {
+                $labels = array_map(static fn ($m) => $m['label'], array_filter($setup['missing'], static fn ($m) => $m['required']));
+                $errors['orders_enabled'] = 'أكمل إعداد المتجر قبل فتح الطلبات: ' . implode('، ', $labels) . '.';
+            }
+        }
+
         if (!empty($errors)) {
             throw new ValidationFailedException('بيانات الإعدادات غير صحيحة.', $errors);
         }

@@ -31,7 +31,7 @@ class Installer
     /**
      * @return array{migrated: bool, admin_email: string, admin_created: bool}
      */
-    public function install(string $adminEmail, string $adminName): array
+    public function install(string $adminEmail, string $adminName, bool $sampleContent = false): array
     {
         $adminEmail = strtolower(trim($adminEmail));
         if (!filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
@@ -48,6 +48,17 @@ class Installer
 
         try {
             service('migrations')->setNamespace(null)->latest();
+
+            // Production data only: defaults, ordering closed, structural categories.
+            $seeder = \Config\Database::seeder();
+            $seeder->setSilent(true);
+            $seeder->call(\App\Database\Seeds\ProductionSeeder::class);
+            // Optional demo catalogue (OFF by default): brands, zones and sample products.
+            if ($sampleContent) {
+                $seeder->call(\App\Database\Seeds\BrandsSeeder::class);
+                $seeder->call(\App\Database\Seeds\ShippingZonesSeeder::class);
+                $seeder->call(\App\Database\Seeds\ProductsSeeder::class);
+            }
 
             $users = new UserModel();
             $existing = $users->where('email', $adminEmail)->first();
@@ -72,7 +83,7 @@ class Installer
 
         log_message('critical', 'Installer completed for {email}. Remove INSTALL_TOKEN from .env.', ['email' => $adminEmail]);
 
-        return ['migrated' => true, 'admin_email' => $adminEmail, 'admin_created' => $created];
+        return ['migrated' => true, 'admin_email' => $adminEmail, 'admin_created' => $created, 'sample_content' => $sampleContent];
     }
 
     protected function lockPath(): string
