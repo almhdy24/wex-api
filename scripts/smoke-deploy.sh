@@ -92,7 +92,7 @@ st=$(curl -sk "${AH[@]}" "$BASE/api/v1/admin/setup-status")
 [[ "$(curl -sk "$BASE/api/v1/shop" | jq -r .data.orders_enabled)" == false ]] && ok "fresh install: ordering closed" || bad "ordering open on fresh install"
 expect_code "422" "${AH[@]}" -X PATCH -d '{"orders_enabled":true}' "$BASE/api/v1/admin/settings"
 expect_code "200" "${AH[@]}" -X PATCH -d '{"shop_whatsapp":"0911000000","shop_address":"عنوان المحل","working_hours":"يوميًا 9 ص - 9 م"}' "$BASE/api/v1/admin/settings"
-expect_code "200 201" "${AH[@]}" -X POST -d '{"bank_name":"بنك الخرطوم","account_name":"المتجر","account_number":"1000001","is_active":true}' "$BASE/api/v1/admin/payment-accounts"
+expect_code "200 201" "${AH[@]}" -X POST -d '{"bank_name":"بنك الخرطوم","account_name":"المتجر","account_number":"1000001","is_active":true,"confirm":true}' "$BASE/api/v1/admin/payment-accounts"
 expect_code "200 201" "${AH[@]}" -X POST -d '{"rate_sdg":650}' "$BASE/api/v1/admin/rates"
 [[ "$(curl -sk "${AH[@]}" "$BASE/api/v1/admin/setup-status" | jq -r .data.complete)" == true ]] && ok "setup complete" || bad "setup still incomplete"
 expect_code "200" "${AH[@]}" -X PATCH -d '{"orders_enabled":true}' "$BASE/api/v1/admin/settings"
