@@ -223,12 +223,23 @@ class MailService
 
     protected function sendViaSmtp(string $to, string $subject, string $htmlBody, ?string $altText = null): bool
     {
-        // MAIL_DRIVER=smtp must actually use SMTP: CI4's Config\Email defaults to PHP mail()
-        // and plain text, which silently ignored the SMTP settings and mangled the HTML body.
-        $config = config('Email');
-        $config->protocol = 'smtp';
+        // MAIL_DRIVER=smtp must actually send over the wire: CI4's Config\Email defaults to
+        // PHP mail() and plain text, which silently ignored the SMTP settings and mangled the
+        // HTML body. The transport is configurable because shared hosts (HelioHost/Plesk) often
+        // block outbound SMTP ports and only accept mail through the local MTA:
+        //   MAIL_PROTOCOL = smtp     (default) -> email.SMTP* settings
+        //   MAIL_PROTOCOL = sendmail            -> local MTA at MAIL_SENDMAIL_PATH
+        //   MAIL_PROTOCOL = mail                -> PHP mail()
+        $config   = config('Email');
+        $protocol = strtolower(trim((string) env('MAIL_PROTOCOL', 'smtp'))) ?: 'smtp';
+
+        $config->protocol = in_array($protocol, ['smtp', 'sendmail', 'mail'], true) ? $protocol : 'smtp';
         $config->mailType = 'html';
         $config->SMTPTimeout = max(15, (int) $config->SMTPTimeout);
+        if ($config->protocol === 'sendmail') {
+            $config->mailPath = (string) env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail');
+        }
+
         $email = Services::email($config, false);
 
         $email->setFrom($this->fromEmail, $this->fromName);
@@ -243,11 +254,31 @@ class MailService
         $sent = $email->send(false);
 
         if (!$sent) {
-            log_message('error', 'SMTP Send Failed: {error}', [
-                'error' => $email->printDebugger(['headers']),
+            // Log only the transport and the SMTP reason, never the full message: the OTP code
+            // travels in the subject, and the debugger dump would leak it into writable/logs.
+            log_message('error', 'Mail send failed (protocol={protocol}, host={host}): {reason}', [
+                'protocol' => $config->protocol,
+                'host'     => $config->SMTPHost,
+                'reason'   => $this->smtpErrorReason($email),
             ]);
         }
 
         return $sent;
+    }
+
+    /** The SMTP failure reason, with the message body/subject (which carries the OTP) stripped out. */
+    private function smtpErrorReason(\CodeIgniter\Email\Email $email): string
+    {
+        $debug = strip_tags($email->printDebugger(['headers']));
+        $lines = [];
+        foreach (preg_split('/\R/', $debug) as $line) {
+            $line = trim($line);
+            // Keep only CI4's own status lines; drop the echoed RFC822 message and its headers.
+            if ($line !== '' && preg_match('/unable to|connect|smtp|refused|timed out|auth|tls|ssl|certificate/i', $line)) {
+                $lines[] = $line;
+            }
+        }
+
+        return $lines === [] ? 'unknown SMTP error' : implode(' | ', array_slice($lines, 0, 4));
     }
 }
