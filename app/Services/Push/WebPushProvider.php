@@ -50,6 +50,14 @@ class WebPushProvider implements PushProviderInterface
         }
 
         try {
+            // web-push v11's 3rd constructor arg is a PSR-18 HTTP client, not a timeout.
+            // Pass an explicit Guzzle client (timeout configured on it) so delivery does not
+            // rely on client auto-discovery, which has no implementation to find on a minimal
+            // install and would throw at send time.
+            $client = new \GuzzleHttp\Client([
+                'timeout'         => $this->timeout,
+                'connect_timeout' => $this->timeout,
+            ]);
             $webPush = new WebPush([
                 'VAPID' => [
                     'subject'    => $this->subject,
@@ -58,7 +66,7 @@ class WebPushProvider implements PushProviderInterface
                 ],
             ], [
                 'TTL' => 86400,
-            ], $this->timeout);
+            ], $client);
 
             $webPush->setReuseVAPIDHeaders(true);
 
