@@ -229,7 +229,7 @@ function generateCardImage($prod, $width, $height, $isGallery = false) {
 
     // Wex Tech watermark
     $brandY = $height - $stagePaddingY - 24;
-    imagestring($img, $fontIdBadge, $stagePaddingX + 24, $brandY, 'WEX TECHNOLOGY - VERIFIED ORIGINAL', $slate);
+    imagestring($img, $fontIdBadge, $stagePaddingX + 24, $brandY, 'WEX TECHNOLOGY', $slate);
 
     return $img;
 }
