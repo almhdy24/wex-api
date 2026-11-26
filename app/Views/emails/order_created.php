@@ -12,7 +12,7 @@
     </tr>
     <tr>
         <td class="label">نوع الاستلام:</td>
-        <td class="value"><?= esc($delivery_type === 'pickup' ? 'استلام من المحل (أم درمان)' : 'توصيل عبر المندوب') ?></td>
+        <td class="value"><?= esc($delivery_type === 'pickup' ? 'استلام من المحل' : 'توصيل عبر المندوب') ?></td>
     </tr>
     <tr>
         <td class="label">المبلغ المطلوب تحويله:</td>

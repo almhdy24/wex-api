@@ -101,13 +101,13 @@
     <div class="container">
         <div class="header">
             <h1>ويكس تكنولوجي - Wex Technology</h1>
-            <div class="subtitle">مول الواحة، الشهداء، أم درمان</div>
+            <?php if (!empty($shop_address)): ?><div class="subtitle"><?= esc($shop_address) ?></div><?php endif; ?>
         </div>
         <div class="content">
             <?= $this->renderSection('content') ?: ($content ?? '') ?>
         </div>
         <div class="footer">
-            <p>ويكس تكنولوجي (Wex Technology) - أم درمان، السودان</p>
+            <p>ويكس تكنولوجي (Wex Technology)</p>
             <p>هذا البريد تم إرساله آلياً، لا تقم بالرد عليه مباشرة.</p>
         </div>
     </div>

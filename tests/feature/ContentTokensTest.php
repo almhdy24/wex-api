@@ -58,6 +58,12 @@ final class ContentTokensTest extends CIUnitTestCase
 
         $terms = json_decode($this->get('/api/v1/content/pages/terms')->getJSON(), true)['data']['body'];
         $this->assertStringNotContainsString('ملاحظة للإدارة', $terms, 'internal admin note shown to customers');
+        foreach (['about', 'terms', 'privacy', 'returns'] as $slug) {
+            $res = json_decode($this->get('/api/v1/content/pages/' . $slug)->getJSON(), true);
+            $this->assertStringNotContainsString('مول الواحة', (string) ($res['data']['body'] ?? ''), "hard-coded location in page {$slug}");
+        }
+        $hero = (string) $this->get('/api/v1/content/hero-slides')->getJSON();
+        $this->assertStringNotContainsString('أم درمان', $hero, 'hard-coded location in hero slides');
         $this->assertStringContainsString('لمدة ساعة واحدة', $terms);
         $this->assertStringNotContainsString('4 ساعات', $terms);
 

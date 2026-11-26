@@ -74,7 +74,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
                 'bank_name'      => $bankName,
                 'account_name'   => $accountName,
                 'account_number' => $accountNumber,
-                'branch'         => 'الفرع الرئيسي - أم درمان',
+                'branch'         => 'الفرع الرئيسي',
                 'notes'          => 'يرجى كتابة رقم الطلب في خانة الملاحظات عند التحويل عبر تطبيق بنكك.',
                 'is_active'      => 1,
                 'sort_order'     => 1,
@@ -232,7 +232,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
         $defaultSlides = [
             [
                 'title'        => 'أجهزة لابتوب لأعمالك ودراستك',
-                'subtitle'     => 'أجهزة مستوردة متوفرة في فرعنا بأم درمان',
+                'subtitle'     => 'أجهزة مستوردة بأسعار واضحة وتثبيت للسعر بعد الطلب',
                 'image'        => '/assets/hero/hero-1.webp',
                 'button_label' => 'استعرض الأجهزة',
                 'link'         => '/catalog',
@@ -485,7 +485,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
             [
                 'slug'       => 'about',
                 'title'      => 'عن ويكس تكنولوجي',
-                'body'       => "ويكس تكنولوجي - متجر لأجهزة اللابتوب ومستلزمات الحواسيب في أم درمان والسودان.\n\nنقدم أجهزة لابتوب لتناسب احتياجات المهندسين والطلاب ورواد الأعمال، مع وضوح في الأسعار بـ ج.س ونظام تثبيت السعر.\n\nمقرنا: مول الواحة، الشهداء، أم درمان.",
+                'body'       => "ويكس تكنولوجي - متجر لأجهزة اللابتوب ومستلزمات الحواسيب.\n\nنقدم أجهزة لابتوب لتناسب احتياجات المهندسين والطلاب ورواد الأعمال، مع وضوح في الأسعار بـ ج.س ونظام تثبيت السعر.\n\nمقرنا: {{shop_address}}.",
                 'is_active'  => 1,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -498,7 +498,7 @@ class CreatePaymentAccountsAnnouncementsAndContentTables extends Migration
             ['key' => 'orders_enabled',           'value' => '1'],
             ['key' => 'orders_disabled_message',  'value' => 'استقبال الطلبات متوقف مؤقتاً في الوقت الحالي، نعتذر عن الإزعاج ونرحب باستفساراتكم عبر الواتساب.'],
             ['key' => 'ticker_enabled',           'value' => '0'],
-            ['key' => 'shop_map_link',            'value' => 'https://maps.google.com/?q=Wex+Technology+Omdurman'],
+            ['key' => 'shop_map_link',            'value' => ''],
             ['key' => 'social_facebook',          'value' => ''],
             ['key' => 'social_instagram',         'value' => ''],
             ['key' => 'footer_text',              'value' => 'ويكس تكنولوجي - أجهزة لابتوب ومستلزمات تقنية في السودان.'],

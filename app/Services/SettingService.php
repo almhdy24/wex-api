@@ -144,7 +144,7 @@ class SettingService
 
         return [
             'shop_name'               => (string) ($all['shop_name'] ?? 'Wex Technology'),
-            'shop_address'            => (string) ($all['shop_address'] ?? 'مول الواحة، الشهداء، أم درمان'),
+            'shop_address'            => (string) ($all['shop_address'] ?? ''),
             'shop_phone'              => (string) ($all['shop_phone'] ?? ''),
             'shop_whatsapp'           => (string) ($all['shop_whatsapp'] ?? ''),
             'working_hours'           => (string) ($all['working_hours'] ?? ''),
@@ -157,7 +157,7 @@ class SettingService
             'policy_inspection_title' => (string) ($all['policy_inspection_title'] ?? 'استلام الأجهزة'),
             'policy_inspection'       => (string) ($all['policy_inspection'] ?? ($all['inspection_note'] ?? 'أجهزة مستوردة؛ يتأكد المشتري من مطابقة الجهاز ومواصفاته الفنية عند الاستلام.')),
             'inspection_note'         => (string) ($all['inspection_note'] ?? ($all['policy_inspection'] ?? '')),
-            'policy_pickup'           => (string) ($all['policy_pickup'] ?? 'يمكنك استلام الجهاز من مقرنا في مول الواحة، الشهداء، أم درمان.'),
+            'policy_pickup'           => (string) ($all['policy_pickup'] ?? 'يمكنك استلام الجهاز من المحل بعد تأكيد الطلب.'),
             'policy_return'           => (string) ($all['policy_return'] ?? ($all['returns_note'] ?? 'نظراً لطبيعة الأجهزة المستوردة، يتم الاستلام والتأكد من الجهاز عند الاستلام.')),
             'returns_note'            => (string) ($all['returns_note'] ?? ($all['policy_return'] ?? '')),
             'lock_hours'              => (int) ($all['lock_hours'] ?? 4),

@@ -51,7 +51,7 @@ class MailService
             'code'      => $code,
             'app_url'   => env('APP_URL', 'http://localhost:3000'),
             'shop_name' => 'Wex Technology - ويكس تكنولوجي',
-        ]);
+        ] + $this->shopFacts());
 
         $alt = "رمز الدخول الخاص بك إلى ويكس تكنولوجي هو: {$code}\nينتهي الرمز خلال 10 دقائق.\nإذا لم تطلب هذا الرمز يمكنك تجاهل هذه الرسالة.";
 
@@ -115,7 +115,7 @@ class MailService
 
             $html = '';
             try {
-                $payload = $item->getPayload();
+                $payload = $item->getPayload() + $this->shopFacts();
                 $html = view('emails/' . $item->template, $payload);
             } catch (\Throwable $e) {
                 // If template missing or render fails, record error
@@ -205,6 +205,20 @@ class MailService
             . "================================\n";
 
         return (bool) file_put_contents($filename, $content, LOCK_EX);
+    }
+
+    /** Shop address / hours / phone from admin settings (empty when not set). */
+    protected function shopFacts(): array
+    {
+        try {
+            $s = new \App\Services\SettingService();
+            return [
+                'shop_address'  => trim((string) $s->get('shop_address', '')),
+                'working_hours' => trim((string) $s->get('working_hours', '')),
+            ];
+        } catch (\Throwable $e) {
+            return ['shop_address' => '', 'working_hours' => ''];
+        }
     }
 
     protected function sendViaSmtp(string $to, string $subject, string $htmlBody, ?string $altText = null): bool

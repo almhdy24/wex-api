@@ -43,7 +43,7 @@ class SettingsController extends BaseApiController
 
         $data = [
             'name'                    => $map['shop_name'] ?? 'Wex Technology (ويكس تكنولوجي)',
-            'address'                 => $map['shop_address'] ?? 'مول الواحة، الشهداء، أم درمان',
+            'address'                 => $map['shop_address'] ?? '',
             'phone'                   => $map['shop_phone'] ?? '',
             'whatsapp'                => $map['shop_whatsapp'] ?? '',
             'working_hours'           => $map['working_hours'] ?? 'من 10 صباحاً إلى 10 مساءً، عدا الجمعة',
@@ -63,7 +63,7 @@ class SettingsController extends BaseApiController
             'policy_inspection_title' => $map['policy_inspection_title'] ?? 'استلام الأجهزة',
             'policy_inspection'       => $map['policy_inspection'] ?? ($map['inspection_note'] ?? 'أجهزة مستوردة؛ يتأكد المشتري من مطابقة الجهاز ومواصفاته الفنية عند الاستلام.'),
             'inspection_note'         => $map['inspection_note'] ?? ($map['policy_inspection'] ?? null),
-            'policy_pickup'           => $map['policy_pickup'] ?? 'يمكنك استلام الجهاز من مقرنا في مول الواحة، الشهداء، أم درمان.',
+            'policy_pickup'           => $map['policy_pickup'] ?? 'يمكنك استلام الجهاز من المحل بعد تأكيد الطلب.',
             'policy_return'           => $map['policy_return'] ?? ($map['returns_note'] ?? 'نظراً لطبيعة الأجهزة المستوردة، يتم الاستلام والتأكد من الجهاز عند الاستلام.'),
             'returns_note'            => $map['returns_note'] ?? ($map['policy_return'] ?? null),
         ];

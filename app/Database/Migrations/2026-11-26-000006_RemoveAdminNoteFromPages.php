@@ -19,7 +19,7 @@ class RemoveAdminNoteFromPages extends Migration
             return;
         }
         foreach ($this->db->table('pages')->select('id, body')->like('body', self::NOTE)->get()->getResultArray() as $row) {
-            $body = rtrim(str_replace(self::NOTE, '', (string) $row['body']));
+            $body = rtrim(str_replace([self::NOTE . '.', self::NOTE], '', (string) $row['body']));
             $this->db->table('pages')->where('id', $row['id'])->update(['body' => $body]);
         }
     }
