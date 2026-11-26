@@ -213,4 +213,16 @@ final class InternalEndpointsTest extends CIUnitTestCase
 
         $this->post('api/install', ['install_token' => self::INST])->assertStatus(410);
     }
+
+    /** Upgrade endpoint: invisible without CRON_TOKEN, refuses a wrong token, migrates idempotently. */
+    public function testUpgradeEndpoint(): void
+    {
+        $this->setEnv('CRON_TOKEN', null);
+        $this->post('api/v1/internal/upgrade')->assertStatus(404);
+        $this->setEnv('CRON_TOKEN', self::CRON);
+        $this->withHeaders(['X-Cron-Token' => 'wrong'])->post('api/v1/internal/upgrade')->assertStatus(403);
+        $this->post('api/v1/internal/upgrade?token=' . self::CRON)->assertStatus(403);
+        $this->withHeaders(['X-Cron-Token' => self::CRON])->post('api/v1/internal/upgrade')->assertStatus(200);
+        $this->withHeaders(['X-Cron-Token' => self::CRON])->post('api/v1/internal/upgrade')->assertStatus(200);
+    }
 }

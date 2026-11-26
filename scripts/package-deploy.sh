@@ -11,7 +11,7 @@ VERSION="${2:-$(git -C "$API_DIR" describe --tags --always 2>/dev/null || date +
 CORE="${3:-_wex_core}"
 OUT="$API_DIR/build/deploy"
 ROOT="$OUT/webroot"
-ZIP="$API_DIR/build/wex-deploy-${VERSION}.zip"
+ZIP="$API_DIR/build/wex-technology-release-${VERSION}.zip"
 
 [[ "$CORE" =~ ^[A-Za-z0-9_-]{3,64}$ ]] || { echo "invalid core dir name: $CORE" >&2; exit 1; }
 
@@ -75,6 +75,15 @@ echo "==> verify-package (dev data, secrets, placeholders)"
 "$API_DIR/scripts/verify-package.sh" "$ROOT" "$CORE"
 
 echo "==> manifest + zip"
-( cd "$ROOT" && find . -type f -not -name MANIFEST.txt | LC_ALL=C sort | xargs sha256sum > MANIFEST.txt )
+{
+  echo "# Wex Technology release $VERSION"
+  echo "# wex-api $(git -C "$API_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+  echo "# wex-web $(git -C "$WEB_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+  echo "# built $(date -u +%Y-%m-%dT%H:%M:%SZ) — sha256 of every file below"
+  ( cd "$ROOT" && find . -type f -not -name MANIFEST.txt | LC_ALL=C sort | xargs sha256sum )
+} > "$OUT/MANIFEST.txt"
+mv "$OUT/MANIFEST.txt" "$ROOT/MANIFEST.txt"
 ( cd "$ROOT" && zip -qr9 "$ZIP" . )
-echo "built $ZIP ($(du -h "$ZIP" | cut -f1)), $(wc -l < "$ROOT/MANIFEST.txt") files"
+( cd "$(dirname "$ZIP")" && sha256sum "$(basename "$ZIP")" > "$(basename "$ZIP").sha256" )
+echo "built $ZIP ($(du -h "$ZIP" | cut -f1)), $(grep -vc '^#' "$ROOT/MANIFEST.txt") files"
+cat "$ZIP.sha256"

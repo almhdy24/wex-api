@@ -1,5 +1,10 @@
 name: Deploy package (HelioHost layout) + smoke test
 
+# The release is built ONLY here (never on a laptop/phone): scripts/package-deploy.sh builds
+# the web app, installs composer --no-dev, assembles public_html, runs verify-package.sh and
+# writes MANIFEST.txt + .sha256. The smoke jobs install that exact zip under Apache +
+# PHP-FPM (HelioHost runs PHP as CGI/FastCGI) on MariaDB 10.6 and MySQL 8.0.
+
 on:
   push:
     branches: [ stabilize, main ]
@@ -10,25 +15,18 @@ concurrency:
   group: deploy-package-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write   # GitHub Release on tags
+
+env:
+  CORE: _wex_core
+
 jobs:
-  package-and-smoke:
+  package:
     runs-on: ubuntu-latest
-    services:
-      mariadb:
-        image: mariadb:10.6
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: wex
-          MARIADB_USER: wex
-          MARIADB_PASSWORD: wexpass
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd="mariadb-admin ping -h 127.0.0.1 -uroot -proot"
-          --health-interval=5s --health-timeout=5s --health-retries=30
-    env:
-      CORE: _wex_core
-      CRON_TOKEN: smoke-cron-token-0123456789abcdef0123456789abcdef
-      INSTALL_TOKEN: smoke-install-token-0123456789abcdef0123456789ab
+    outputs:
+      name: ${{ steps.pkg.outputs.name }}
+      version: ${{ steps.pkg.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with: { path: wex-api }
@@ -39,7 +37,7 @@ jobs:
           path: wex-web
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: '8.3'   # HelioHost: PHP 8.3 (CGI/FastCGI)
           extensions: mbstring, intl, gd, mysqli, sqlite3
           tools: composer
           coverage: none
@@ -49,67 +47,207 @@ jobs:
           cache: npm
           cache-dependency-path: wex-web/package-lock.json
 
-      - name: Build package
+      - name: Build release package (runs verify-package.sh)
         id: pkg
         working-directory: wex-api
         run: |
           VERSION="${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
           scripts/package-deploy.sh ../wex-web "$VERSION" "$CORE"
-          echo "zip=build/wex-deploy-$VERSION.zip" >> "$GITHUB_OUTPUT"
-          echo "name=wex-deploy-$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=wex-technology-release-$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Upload package artifact
+      - name: verify-package self-test (every planted violation must fail the scan)
+        working-directory: wex-api
+        run: |
+          ROOT=build/deploy/webroot
+          API="$PWD"
+          scripts/verify-package.sh "$ROOT" "$CORE"
+          plant() {
+            rm -rf /tmp/vt && cp -R "$ROOT" /tmp/vt
+            ( cd /tmp/vt && eval "$2" )
+            if scripts/verify-package.sh /tmp/vt "$CORE" >/tmp/vt.log 2>&1; then
+              echo "SELF-TEST FAILED: scanner accepted: $1"; exit 1
+            fi
+            echo "ok: rejects $1 -> $(head -1 /tmp/vt.log)"
+          }
+          plant "sqlite database"    "touch $CORE/writable/database/wex.sqlite"
+          plant ".env file"          "echo 'X = 1' > $CORE/.env"
+          plant "log file"           "echo x > $CORE/writable/logs/log-2026-01-01.log"
+          plant "receipt upload"     "echo x > $CORE/writable/uploads/proofs/r.jpg"
+          plant "product image"      "mkdir -p uploads/products && echo x > uploads/products/p.jpg"
+          plant "filled env secret"  "echo 'JWT_SECRET = abcdef0123456789' >> $CORE/.env.example"
+          plant "private key"        "printf -- '-----BEGIN PRIVATE KEY-----\nx\n' > key.txt"
+          plant "service account"    "echo '{\"type\": \"service_account\"}' > sa.json"
+          plant "placeholder domain" "echo 'admin@wextechnology.com' > notes.txt"
+          plant "example.com"        "echo 'https://example.com' > notes.txt"
+          plant "placeholder phone"  "echo '0912345678' > c.txt"
+          plant "CI admin name"      "echo 'مدير النظام (CI)' > n.txt"
+          plant "DevSeeder"          "cp $API/app/Database/Seeds/DevSeeder.php $CORE/app/Database/Seeds/"
+          plant "tests dir"          "mkdir -p $CORE/tests && touch $CORE/tests/x.php"
+          plant "install.lock"       "touch $CORE/writable/install.lock"
+
+      - name: Upgrade zip
+        working-directory: wex-api
+        run: scripts/make-upgrade-zip.sh build/deploy/webroot "${{ steps.pkg.outputs.version }}" "$CORE"
+
+      - name: Summary
+        working-directory: wex-api/build
+        run: |
+          {
+            echo "### Release ${{ steps.pkg.outputs.version }}"
+            echo '```'
+            ls -l *.zip
+            cat *.sha256
+            head -8 deploy/webroot/MANIFEST.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pkg.outputs.name }}
-          path: wex-api/${{ steps.pkg.outputs.zip }}
-          retention-days: 30
+          path: |
+            wex-api/build/wex-technology-*.zip
+            wex-api/build/wex-technology-*.zip.sha256
+          retention-days: 90
+          compression-level: 0
 
-      - name: Install package into Apache (php:8.3-apache, AllowOverride All)
+      - name: GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: wex-api/build
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p /tmp/site && unzip -q "wex-api/${{ steps.pkg.outputs.zip }}" -d /tmp/site
+          gh release create "$GITHUB_REF_NAME" wex-technology-*.zip wex-technology-*.sha256 -R "$GITHUB_REPOSITORY" \
+            --title "Wex Technology $GITHUB_REF_NAME" --notes "Release package for HelioHost public_html. See docs/DEPLOY_HELIOHOST.md." \
+          || gh release upload "$GITHUB_REF_NAME" wex-technology-*.zip wex-technology-*.sha256 -R "$GITHUB_REPOSITORY" --clobber
+
+  smoke:
+    needs: package
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - { name: mariadb-10.6, image: 'mariadb:10.6', health: 'mariadb-admin ping -h 127.0.0.1 -uroot -proot' }
+          - { name: mysql-8.0,    image: 'mysql:8.0',    health: 'mysqladmin ping -h 127.0.0.1 -uroot -proot' }
+    name: smoke (${{ matrix.db.name }}, Apache + PHP-FPM 8.3)
+    services:
+      db:
+        image: ${{ matrix.db.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wex
+          MYSQL_USER: wex
+          MYSQL_PASSWORD: wexpass
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: wex
+          MARIADB_USER: wex
+          MARIADB_PASSWORD: wexpass
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="${{ matrix.db.health }}"
+          --health-interval=5s --health-timeout=5s --health-retries=40
+    env:
+      CRON_TOKEN: smoke-cron-token-0123456789abcdef0123456789abcdef
+      INSTALL_TOKEN: smoke-install-token-0123456789abcdef0123456789ab
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: wex-api }
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.package.outputs.name }}
+          path: dist
+      - name: Checksum of the downloaded zip matches
+        working-directory: dist
+        run: sha256sum -c wex-technology-release-*.zip.sha256
+
+      - name: Install the zip into Apache + PHP-FPM (AllowOverride All, HTTPS)
+        run: |
+          mkdir -p /tmp/site && unzip -q dist/wex-technology-release-*.zip -d /tmp/site
           cp /tmp/site/$CORE/.env.example /tmp/site/$CORE/.env
+          # Only what the owner fills by hand; secrets come from the installer's generator.
           sed -i \
             -e "s|^app.baseURL = .*|app.baseURL = 'https://127.0.0.1/'|" \
             -e "s|^database.default.hostname = .*|database.default.hostname = 127.0.0.1|" \
             -e "s|^database.default.database =.*|database.default.database = wex|" \
             -e "s|^database.default.username =.*|database.default.username = wex|" \
             -e "s|^database.default.password =.*|database.default.password = wexpass|" \
-            -e "s|^encryption.key =.*|encryption.key = hex2bin:$(openssl rand -hex 32)|" \
-            -e "s|^JWT_SECRET =.*|JWT_SECRET = $(openssl rand -hex 32)|" \
             -e "s|^MAIL_DRIVER = .*|MAIL_DRIVER = log|" \
-            -e "s|^PUSH_PROVIDER = .*|PUSH_PROVIDER = fake|" \
             -e "s|^CRON_TOKEN =.*|CRON_TOKEN = $CRON_TOKEN|" \
             -e "s|^INSTALL_TOKEN =.*|INSTALL_TOKEN = $INSTALL_TOKEN|" \
             /tmp/site/$CORE/.env
           chmod -R 777 /tmp/site/$CORE/writable /tmp/site/uploads
-          cat > /tmp/Dockerfile <<'DOCKER'
-          FROM php:8.3-apache
-          RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpng-dev libjpeg-dev libwebp-dev \
+          chmod 666 /tmp/site/$CORE/.env
+          mkdir -p /tmp/img && cat > /tmp/img/Dockerfile <<'DOCKER'
+          FROM php:8.3-fpm
+          RUN apt-get update && apt-get install -y --no-install-recommends apache2 libicu-dev libpng-dev libjpeg-dev libwebp-dev \
            && docker-php-ext-configure gd --with-jpeg --with-webp \
            && docker-php-ext-install -j"$(nproc)" intl gd mysqli \
-           && a2enmod rewrite headers deflate \
-           && a2enmod ssl && a2ensite default-ssl \
+           && a2enmod rewrite headers deflate proxy_fcgi setenvif ssl \
+           && a2ensite default-ssl \
            && openssl req -x509 -nodes -days 2 -newkey rsa:2048 -subj "/CN=127.0.0.1" \
                 -keyout /etc/ssl/private/ssl-cert-snakeoil.key -out /etc/ssl/certs/ssl-cert-snakeoil.pem \
-           && sed -ri 's#AllowOverride None#AllowOverride All#g' /etc/apache2/apache2.conf
+           && sed -ri 's#AllowOverride None#AllowOverride All#g' /etc/apache2/apache2.conf \
+           && printf '<FilesMatch "\\.php$">\n  SetHandler "proxy:fcgi://127.0.0.1:9000"\n</FilesMatch>\nDirectoryIndex index.html index.php\n' > /etc/apache2/conf-enabled/php-fpm.conf
+          CMD ["sh", "-c", "php-fpm -D && exec apachectl -D FOREGROUND"]
           DOCKER
-          docker build -q -t wex-apache /tmp
-          docker run -d --name wex --network host -v /tmp/site:/var/www/html wex-apache
-          for i in $(seq 1 30); do curl -sk -o /dev/null https://127.0.0.1/ && break; sleep 1; done
+          docker build -q -t wex-fpm /tmp/img
+          docker run -d --name wex --network host -v /tmp/site:/var/www/html wex-fpm
+          for i in $(seq 1 40); do curl -sk -o /dev/null https://127.0.0.1/ && break; sleep 1; done
+          # mod_php must be absent: proves php_flag lines are guarded (they 500 under CGI/FPM)
+          docker exec wex sh -c '! apachectl -M 2>/dev/null | grep -q php_module'
 
-      - name: First-time setup through the web installer (with the optional sample catalogue)
+      - name: First run through the browser installer (secrets generator, then install)
         run: |
-          curl -sfk -X POST -H "X-Install-Token: $INSTALL_TOKEN" -H 'Content-Type: application/json' \
-            -d '{"admin_email":"owner@smoke.test","admin_name":"صاحب المتجر","sample_content":true}' https://127.0.0.1/api/v1/internal/install | tee /tmp/install.json
-          test "$(jq -r .success /tmp/install.json)" = "true"
+          U=https://127.0.0.1/api/install
+          curl -sk -o /dev/null -w '%{http_code}\n' $U | tee /tmp/c; test "$(cat /tmp/c)" = 200
+          curl -sfk -X POST --data-urlencode "install_token=$INSTALL_TOKEN" -d action=secrets $U -o /tmp/secrets.html
+          grep -q 'تم توليد المفاتيح الناقصة' /tmp/secrets.html
+          grep -qE '^JWT_SECRET = [0-9a-f]{64}$' /tmp/site/$CORE/.env
+          grep -qE '^encryption.key = hex2bin:[0-9a-f]{64}$' /tmp/site/$CORE/.env
+          grep -qE '^VAPID_PRIVATE_KEY = .{20,}$' /tmp/site/$CORE/.env
+          grep -q "^CRON_TOKEN = $CRON_TOKEN$" /tmp/site/$CORE/.env   # existing values untouched
+          JWT=$(sed -n 's/^JWT_SECRET = //p' /tmp/site/$CORE/.env)
+          ! grep -q "$JWT" /tmp/secrets.html   # written to .env, never echoed to the page
+          curl -sfk -X POST --data-urlencode "install_token=$INSTALL_TOKEN" -d action=install \
+            --data-urlencode 'admin_email=owner@smoke.test' --data-urlencode 'admin_name=صاحب المتجر' -d sample_content=1 \
+            $U -o /tmp/done.html
+          grep -q 'تم التثبيت بنجاح' /tmp/done.html
           docker exec wex php -r '$d=new mysqli("127.0.0.1","wex","wexpass","wex"); $d->query("UPDATE products SET stock_quantity=50");'
 
-      - name: Smoke test (security, SPA deep links, caching, auth boundaries)
+      - name: Smoke test (security, caching, first-run setup, journeys, permissions, maintenance)
         working-directory: wex-api
         run: scripts/smoke-deploy.sh https://127.0.0.1 wex "$CORE"
 
-      - name: Apache / app logs on failure
+      - name: Upgrade path (upgrade zip over the live site keeps .env, uploads and data)
+        run: |
+          before=$(sha256sum /tmp/site/$CORE/.env | cut -d' ' -f1)
+          unzip -oq dist/wex-technology-upgrade-*.zip -d /tmp/site
+          test "$(sha256sum /tmp/site/$CORE/.env | cut -d' ' -f1)" = "$before"
+          test -f /tmp/site/$CORE/writable/install.lock
+          curl -sk -o /dev/null -w '%{http_code}' -X POST https://127.0.0.1/api/v1/internal/upgrade | tee /tmp/c; echo
+          test "$(cat /tmp/c)" = 401 -o "$(cat /tmp/c)" = 403
+          curl -sfk -X POST -H "X-Cron-Token: $CRON_TOKEN" https://127.0.0.1/api/v1/internal/upgrade | tee /tmp/up.json; echo
+          test "$(jq -r .success /tmp/up.json)" = true
+          curl -sfk 'https://127.0.0.1/api/v1/products?per_page=1' | jq -e '.data | length == 1'
+
+      - name: Browser pass over the package (360x800 + 1280x800, console errors fail)
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i --silent playwright@1.49.1 && npx playwright install --with-deps chromium >/dev/null
+          SLUG=$(curl -sk 'https://127.0.0.1/api/v1/products?per_page=1' | jq -r '.data[0].slug')
+          cp $GITHUB_WORKSPACE/wex-api/scripts/ci/package-ui.mjs /tmp/pw/
+          node /tmp/pw/package-ui.mjs https://127.0.0.1 /tmp/package-ui "$SLUG"
+
+      - name: Package UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-ui-${{ matrix.db.name }}
+          path: /tmp/package-ui
+          retention-days: 14
+
+      - name: Logs on failure
         if: failure()
         run: |
           docker logs wex 2>&1 | tail -80 || true

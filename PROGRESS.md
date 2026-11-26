@@ -7,7 +7,7 @@ NOTE: auth is passwordless (email OTP / Google): installer takes the admin EMAIL
 the admin to log in. No default passwords exist anywhere.
 
 Phase 1 — clean inputs
-- [ ] 1.1 scripts/verify-package.sh (dev data, secrets, placeholder contacts/domains) wired into package-deploy
+- [x] 1.1 scripts/verify-package.sh (dev data, secrets, placeholder contacts/domains) wired into package-deploy
 - [x] 1.2 production data: migrations insert only required settings; installer creates admin; sample content OFF by default
 - [x] 1.3 testing-only features unreachable in production (testing-login, fake push, DevSeeder) + tests
 - [x] 1.4 lock-hours duration from setting everywhere (Arabic plural), migration for unmodified defaults, copy test

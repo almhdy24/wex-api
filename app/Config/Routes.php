@@ -17,6 +17,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
     // Shared-hosting internals (404 unless CRON_TOKEN / INSTALL_TOKEN are configured)
     $routes->match(['get', 'post'], 'internal/cron', 'InternalController::cron', ['filter' => 'throttle:12,60,cron']);
     $routes->post('internal/install', 'InternalController::install', ['filter' => 'throttle:5,600,install']);
+    $routes->post('internal/upgrade', 'InternalController::upgrade', ['filter' => 'throttle:5,600,upgrade']);
 
     // Authentication (Public)
     $routes->group('auth', static function (RouteCollection $routes) {

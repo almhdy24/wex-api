@@ -117,6 +117,26 @@ expect_code "401" "${API[@]}" "$BASE$URL"
 expect_code "403 404" "${API[@]}" -H "Authorization: Bearer $B" "$BASE$URL"
 expect_code "200" "${API[@]}" -H "Authorization: Bearer $A" "$BASE$URL"
 expect_code "403 404" "$BASE/$CORE/writable/uploads/proofs/"
+
+# 7b. Admin journey + cross-surface sync: approve the receipt, move the order on, the
+#     customer sees each state.
+od=$(curl -sk "${AH[@]}" "$BASE/api/v1/admin/orders/$ORDER")
+PROOF=$(jq -r '(.data.payment_proofs // .data.proofs // [])[-1].id' <<<"$od")
+[[ "$PROOF" =~ ^[0-9]+$ ]] && ok "admin sees the receipt ($PROOF)" || bad "admin order detail has no proof"
+expect_code "200" "${AH[@]}" -X POST -d '{"action":"approve"}' "$BASE/api/v1/admin/orders/$ORDER/proofs/$PROOF/review"
+st=$(curl -sk -H "Authorization: Bearer $A" "$BASE/api/v1/orders/$ORDER" | jq -r .data.status)
+[[ "$st" == confirmed ]] && ok "customer sees confirmed" || bad "customer status after approve: $st"
+expect_code "200" "${AH[@]}" -X PATCH -d '{"status":"processing"}' "$BASE/api/v1/admin/orders/$ORDER/status"
+st=$(curl -sk -H "Authorization: Bearer $A" "$BASE/api/v1/orders/$ORDER" | jq -r .data.status)
+[[ "$st" == processing ]] && ok "customer sees processing" || bad "customer status after change: $st"
+expect_code "403 404" -H "Authorization: Bearer $B" "$BASE/api/v1/orders/$ORDER"
+
+# 7c. Uploads must be images (non-image rejected)
+ORDER2=$(curl -sk -H "Authorization: Bearer $A" -H 'Content-Type: application/json' -H "Idempotency-Key: smoke-second-$RANDOM$RANDOM" \
+  -d "{\"order_type\":\"pickup\",\"contact_phone\":\"0912345678\",\"items\":[{\"product_id\":$PID,\"quantity\":1}]}" \
+  "$BASE/api/v1/orders" | jq -r '.data.order_number')
+echo 'not an image' > /tmp/fake.png
+expect_code "400 415 422" -H "Authorization: Bearer $A" -F "proof_image=@/tmp/fake.png;type=image/png" "$BASE/api/v1/orders/$ORDER2/payment-proof"
 expect_code "401" "${API[@]}" "$BASE/api/v1/admin/orders"
 expect_code "403" "${API[@]}" -H "Authorization: Bearer $A" "$BASE/api/v1/admin/orders"
 

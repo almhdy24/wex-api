@@ -65,4 +65,26 @@ class InternalController extends BaseApiController
 
         return $this->respondSuccess($result, 'تم التثبيت بنجاح. احذف INSTALL_TOKEN من ملف .env الآن.');
     }
+
+    /**
+     * POST /api/v1/internal/upgrade   header: X-Cron-Token: <CRON_TOKEN>
+     * After uploading an upgrade zip: runs pending migrations (idempotent: nothing to do
+     * returns the same success). Header only; never accepts the token in the query string.
+     */
+    public function upgrade(): ResponseInterface
+    {
+        if (strlen((string) env('CRON_TOKEN', '')) < 32) {
+            return $this->respondError(lang('Api.route_not_found'), 404);
+        }
+        if (!CronRunner::tokenIsValid($this->request->getHeaderLine('X-Cron-Token'))) {
+            return $this->respondError('غير مصرّح.', 403);
+        }
+
+        $runner = service('migrations')->setNamespace(null);
+        $before = count($runner->findMigrations());
+        $runner->latest();
+        log_message('notice', 'Upgrade: migrations brought to latest.');
+
+        return $this->respondSuccess(['migrated' => true, 'known_migrations' => $before], 'تم تحديث قاعدة البيانات.');
+    }
 }
