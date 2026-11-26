@@ -24,6 +24,20 @@ class SettingService
     /**
      * Allowed settings keys that can be updated via the admin settings API.
      */
+    public const BOOLEAN_KEYS = ['orders_enabled', 'ticker_enabled', 'push_enabled'];
+
+    /**
+     * Reads a stored boolean setting. Missing -> $default. '' counts as off: it is what a
+     * JSON false was stored as before booleans were normalised, so old rows read correctly.
+     */
+    public static function isOn(mixed $value, bool $default): bool
+    {
+        if ($value === null) {
+            return $default;
+        }
+        return !in_array(strtolower(trim((string) $value)), ['0', '', 'false', 'off', 'no'], true);
+    }
+
     protected const ALLOWED_SETTING_KEYS = [
         'shop_name',
         'shop_address',
@@ -125,8 +139,8 @@ class SettingService
     {
         $all = $this->getAllSettings();
 
-        $ordersEnabled = !isset($all['orders_enabled']) || ($all['orders_enabled'] !== '0' && $all['orders_enabled'] !== 0);
-        $tickerEnabled = isset($all['ticker_enabled']) && ($all['ticker_enabled'] === '1' || $all['ticker_enabled'] === 1);
+        $ordersEnabled = self::isOn($all['orders_enabled'] ?? null, true);
+        $tickerEnabled = self::isOn($all['ticker_enabled'] ?? null, false);
 
         return [
             'shop_name'               => (string) ($all['shop_name'] ?? 'Wex Technology'),
@@ -243,6 +257,10 @@ class SettingService
                 } else {
                     $updates[$key] = (string) $val;
                 }
+            } elseif (in_array($key, self::BOOLEAN_KEYS, true)) {
+                // JSON booleans: (string) false === '' was stored and read back as "on", so
+                // turning orders off from the admin panel never reached the storefront.
+                $updates[$key] = \App\Libraries\Input::bool($value) ? '1' : '0';
             } elseif ($key === 'shop_map_link') {
                 $val = trim((string) $value);
                 if (!\App\Libraries\SafeUrl::isSafeLink($val)) {

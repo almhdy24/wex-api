@@ -77,8 +77,8 @@ class OrderService
     public function createOrder(int $userId, array $data): array
     {
         // Guard 1: Are orders enabled?
-        $ordersEnabled = $this->settingService->get('orders_enabled', '1');
-        if ($ordersEnabled === '0' || $ordersEnabled === 0 || $ordersEnabled === false) {
+        // '' (a bug-era JSON false) must also close ordering, not only '0'.
+        if (!SettingService::isOn($this->settingService->get('orders_enabled', '1'), true)) {
             $msg = (string) $this->settingService->get('orders_disabled_message', 'استقبال الطلبات متوقف مؤقتاً في الوقت الحالي، نعتذر عن الإزعاج.');
             throw new ValidationFailedException($msg, ['orders' => $msg]);
         }

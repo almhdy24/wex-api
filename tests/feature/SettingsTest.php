@@ -223,6 +223,40 @@ final class SettingsTest extends CIUnitTestCase
     }
 
     // API-XSS-01: shop_map_link is rendered as href in the storefront footer.
+    /**
+     * Turning orders off from the admin panel (JSON false) stored '' which every reader took
+     * as "on": the storefront kept selling and the API kept accepting orders.
+     */
+    public function testOrdersToggleOffReachesStorefrontAndBlocksOrders(): void
+    {
+        $patch = function (array $body) {
+            return $this->withHeaders(['Authorization' => 'Bearer ' . $this->adminToken])
+                ->withBodyFormat('json')->patch('/api/v1/admin/settings', $body);
+        };
+
+        $patch(['orders_enabled' => false, 'ticker_enabled' => true])->assertStatus(200);
+        $this->assertSame('0', (new SettingModel())->where('key', 'orders_enabled')->first()->value ?? null);
+
+        $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
+        $this->assertFalse($shop['orders_enabled']);
+        $this->assertTrue($shop['ticker_enabled']);
+
+        $order = $this->withHeaders(['Authorization' => 'Bearer ' . $this->customerToken, 'Idempotency-Key' => 'settings-toggle-key-1'])
+            ->withBodyFormat('json')->post('/api/v1/orders', ['order_type' => 'pickup', 'contact_phone' => '0912345678', 'items' => [['product_id' => 1, 'quantity' => 1]]]);
+        $order->assertStatus(422);
+
+        // Rows written as '' before the fix also read as off.
+        $db = \Config\Database::connect();
+        $db->table('settings')->where('key', 'orders_enabled')->update(['value' => '']);
+        $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
+        $this->assertFalse($shop['orders_enabled']);
+
+        $patch(['orders_enabled' => true, 'ticker_enabled' => false])->assertStatus(200);
+        $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
+        $this->assertTrue($shop['orders_enabled']);
+        $this->assertFalse($shop['ticker_enabled']);
+    }
+
     public function testShopMapLinkRejectsJavascriptUrl(): void
     {
         $res = $this->withHeaders([
