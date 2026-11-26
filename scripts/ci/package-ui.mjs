@@ -14,7 +14,9 @@ const pages = [
 const viewports = [['mobile-360', 360, 800], ['desktop-1280', 1280, 800]];
 const failures = [];
 
-const browser = await chromium.launch();
+// The CI certificate is self-signed: Chrome refuses service-worker scripts over it even
+// with ignoreHTTPSErrors, so trust it at browser level (a real site has a valid cert).
+const browser = await chromium.launch({ args: ['--ignore-certificate-errors'] });
 for (const [vpName, width, height] of viewports) {
   const dir = path.join(out, vpName);
   fs.mkdirSync(dir, { recursive: true });
@@ -27,6 +29,10 @@ for (const [vpName, width, height] of viewports) {
       if (m.type() === 'error' && !/status of 401/.test(m.text())) errors.push(m.text());
     });
     page.on('pageerror', (e) => errors.push(e.message));
+    // Name the URL behind every failed resource, so a "Failed to load resource" is actionable.
+    page.on('response', (r) => {
+      if (r.status() >= 400 && r.status() !== 401) errors.push(`HTTP ${r.status()} ${r.url().replace(base, '')}`);
+    });
     try {
       const res = await page.goto(base + p, { waitUntil: 'networkidle', timeout: 30000 });
       const status = res ? res.status() : 0;
@@ -41,7 +47,7 @@ for (const [vpName, width, height] of viewports) {
     } catch (e) {
       failures.push(`${vpName} ${p}: ${e.message.split('\n')[0]}`);
     }
-    if (errors.length) failures.push(`${vpName} ${p}: console: ${errors.join(' | ').slice(0, 300)}`);
+    if (errors.length) failures.push(`${vpName} ${p}: console: ${errors.join(' | ').slice(0, 600)}`);
     await page.close();
     console.log(`  ${vpName} ${p}`);
   }
