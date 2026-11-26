@@ -150,7 +150,8 @@ engines keep the index). Delete the file to reopen.
    This zip never contains `_wex_core/.env`, `_wex_core/writable/` or uploaded images, so live
    data, receipts, sessions and the install lock are untouched (CI checks this).
 3. Delete `.maintenance`, then run migrations from any computer or phone:
-   `curl -X POST -H "X-Cron-Token: <CRON_TOKEN>" https://wex-technology.com/api/v1/internal/upgrade`
+   `curl -X POST -H "Content-Type: application/json" -H "X-Cron-Token: <CRON_TOKEN>" -d '{}' https://wex-technology.com/api/v1/internal/upgrade`
+   (HelioHost's firewall rejects a POST with no body — the `-d '{}'` is required.)
    → `"success": true` and «تم تحديث قاعدة البيانات.» (403 without the token; rate-limited).
 4. The app shell is `no-cache`, so phones pick up the new build on the next visit.
 5. Compare `MANIFEST.txt` (version, commits, sha256 per file) to see what changed.
