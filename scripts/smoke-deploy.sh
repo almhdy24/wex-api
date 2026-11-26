@@ -126,9 +126,9 @@ PROOF=$(jq -r '(.data.payment_proofs // .data.proofs // [])[-1].id' <<<"$od")
 expect_code "200" "${AH[@]}" -X POST -d '{"action":"approve"}' "$BASE/api/v1/admin/orders/$ORDER/proofs/$PROOF/review"
 st=$(curl -sk -H "Authorization: Bearer $A" "$BASE/api/v1/orders/$ORDER" | jq -r .data.status)
 [[ "$st" == confirmed ]] && ok "customer sees confirmed" || bad "customer status after approve: $st"
-expect_code "200" "${AH[@]}" -X PATCH -d '{"status":"processing"}' "$BASE/api/v1/admin/orders/$ORDER/status"
+expect_code "200" "${AH[@]}" -X PATCH -d '{"status":"ready_for_pickup","note":"تم تجهيز الجهاز"}' "$BASE/api/v1/admin/orders/$ORDER/status"
 st=$(curl -sk -H "Authorization: Bearer $A" "$BASE/api/v1/orders/$ORDER" | jq -r .data.status)
-[[ "$st" == processing ]] && ok "customer sees processing" || bad "customer status after change: $st"
+[[ "$st" == ready_for_pickup ]] && ok "customer sees ready for pickup" || bad "customer status after change: $st"
 expect_code "403 404" -H "Authorization: Bearer $B" "$BASE/api/v1/orders/$ORDER"
 
 # 7c. Uploads must be images (non-image rejected)
@@ -159,7 +159,7 @@ docker exec "$CT" sh -c 'touch /var/www/html/.maintenance'
 expect_code "503" "$BASE/"
 expect_code "503" "$BASE/api/v1/ping"
 curl -sk "$BASE/products" | grep -q 'قيد الصيانة' && ok "maintenance page body" || bad "maintenance page missing"
-hdr "$BASE/" | grep -qi '^retry-after:' && ok "Retry-After on 503" || bad "Retry-After missing"
+H503=$(hdr "$BASE/"); grep -qi '^retry-after:' <<<"$H503" && ok "Retry-After on 503" || bad "Retry-After missing"
 docker exec "$CT" sh -c 'rm -f /var/www/html/.maintenance'
 expect_code "200" "$BASE/api/v1/ping"
 expect_code "200" "$BASE/offline.html"
