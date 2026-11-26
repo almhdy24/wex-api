@@ -12,10 +12,15 @@ Phase 1 — clean inputs
 - [x] 1.3 testing-only features unreachable in production (testing-login, fake push, DevSeeder) + tests
 - [x] 1.4 lock-hours duration from setting everywhere (Arabic plural), migration for unmodified defaults, copy test
 - [x] 1.5 orders disabled until setup complete; GET /admin/setup-status + admin banner "أكمل إعداد المتجر"; tests
-Phase 2 — layout: htaccess cache/security, uploads no-exec, maintenance 503, offline.html, PHP matrix, HelioHost findings
-Phase 3 — installer UI page (env check, DB test, migrate, admin, lock, secrets helper), .env.example, cron docs
-Phase 4 — release zip name/manifest/release; smoke on zip (MariaDB + MySQL 8) incl. journeys; upgrade zip
-Phase 5 — docs (DEPLOY_HELIOHOST, smoke checklist, DELIVERY_READINESS), artifact download to ~/storage/downloads
+- [x] Phase 2 — root.htaccess (SSR public max-age=60 + ETag/304, never no-store; shell no-cache), security headers,
+      uploads image allow-list + no-exec (CGI-safe IfModule), maintenance 503 (.maintenance), offline.html, findings in docs
+- [x] Phase 3 — /api/install UI (token, checks, DB test, secrets generator -> .env, admin email, sample OFF, 410 lock), env example documented
+- [x] Phase 4 — wex-technology-release-<v>.zip + .sha256 + MANIFEST header; upgrade zip + POST internal/upgrade (X-Cron-Token);
+      deploy-package.yml: package job (scanner + self-test, GitHub Release on v* tag) + smoke matrix MariaDB10.6/MySQL8 on
+      Apache+PHP-FPM8.3 (installer via browser form, smoke-deploy, upgrade path, Playwright package-ui 360/1280)
+      Found by CI: scanner never matched private keys (grep took '-----' as option) a91f803; installer test leaked orders_enabled=0
+      into later suites a91f803; smoke payment account needs confirm c2e81e7.
+- [ ] Phase 5 — docs/DEPLOY_HELIOHOST.md DONE (6c58931); DELIVERY_READINESS.md; download zip to ~/storage/downloads; final report
 
 
 ## Production Readiness Sprint (HelioHost + UX + Copy) — Active (started 2026-11-25)
