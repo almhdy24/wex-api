@@ -209,7 +209,13 @@ class MailService
 
     protected function sendViaSmtp(string $to, string $subject, string $htmlBody, ?string $altText = null): bool
     {
-        $email = Services::email();
+        // MAIL_DRIVER=smtp must actually use SMTP: CI4's Config\Email defaults to PHP mail()
+        // and plain text, which silently ignored the SMTP settings and mangled the HTML body.
+        $config = config('Email');
+        $config->protocol = 'smtp';
+        $config->mailType = 'html';
+        $config->SMTPTimeout = max(15, (int) $config->SMTPTimeout);
+        $email = Services::email($config, false);
 
         $email->setFrom($this->fromEmail, $this->fromName);
         $email->setTo($to);
