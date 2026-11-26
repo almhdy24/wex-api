@@ -1,5 +1,23 @@
 # Wex Technology API - Project Progress Tracker
 
+## RELEASE PACKAGE SPRINT (HelioHost public_html) — Active (started 2026-11-26)
+
+Resume here. Release = scripts/package-deploy.sh in CI (deploy-package.yml). Never build on the phone.
+NOTE: auth is passwordless (email OTP / Google): installer takes the admin EMAIL; SMTP must work for
+the admin to log in. No default passwords exist anywhere.
+
+Phase 1 — clean inputs
+- [ ] 1.1 scripts/verify-package.sh (dev data, secrets, placeholder contacts/domains) wired into package-deploy
+- [ ] 1.2 production data: migrations insert only required settings; installer creates admin; sample content OFF by default
+- [ ] 1.3 testing-only features unreachable in production (testing-login, fake push, DevSeeder) + tests
+- [ ] 1.4 lock-hours duration from setting everywhere (Arabic plural), migration for unmodified defaults, copy test
+- [ ] 1.5 orders disabled until setup complete; GET /admin/setup-status + admin banner "أكمل إعداد المتجر"; tests
+Phase 2 — layout: htaccess cache/security, uploads no-exec, maintenance 503, offline.html, PHP matrix, HelioHost findings
+Phase 3 — installer UI page (env check, DB test, migrate, admin, lock, secrets helper), .env.example, cron docs
+Phase 4 — release zip name/manifest/release; smoke on zip (MariaDB + MySQL 8) incl. journeys; upgrade zip
+Phase 5 — docs (DEPLOY_HELIOHOST, smoke checklist, DELIVERY_READINESS), artifact download to ~/storage/downloads
+
+
 ## Production Readiness Sprint (HelioHost + UX + Copy) — Active (started 2026-11-25)
 
 Phase 0 (truth & green):
