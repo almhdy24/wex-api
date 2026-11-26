@@ -98,12 +98,11 @@ jobs:
           docker run -d --name wex --network host -v /tmp/site:/var/www/html wex-apache
           for i in $(seq 1 30); do curl -sk -o /dev/null https://127.0.0.1/ && break; sleep 1; done
 
-      - name: First-time setup through the web installer, then seed a demo catalog
+      - name: First-time setup through the web installer (with the optional sample catalogue)
         run: |
           curl -sfk -X POST -H "X-Install-Token: $INSTALL_TOKEN" -H 'Content-Type: application/json' \
-            -d '{"admin_email":"owner@smoke.test","admin_name":"صاحب المتجر"}' https://127.0.0.1/api/v1/internal/install | tee /tmp/install.json
+            -d '{"admin_email":"owner@smoke.test","admin_name":"صاحب المتجر","sample_content":true}' https://127.0.0.1/api/v1/internal/install | tee /tmp/install.json
           test "$(jq -r .success /tmp/install.json)" = "true"
-          docker exec -e CI_ENVIRONMENT=development wex php /var/www/html/$CORE/spark db:seed DatabaseSeeder
           docker exec wex php -r '$d=new mysqli("127.0.0.1","wex","wexpass","wex"); $d->query("UPDATE products SET stock_quantity=50");'
 
       - name: Smoke test (security, SPA deep links, caching, auth boundaries)

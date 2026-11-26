@@ -53,7 +53,11 @@ xml=$(curl -sk "$BASE/sitemap.xml"); grep -q "/products/$SLUG</loc>" <<<"$xml" &
 curl -sk "$BASE/robots.txt" | grep -q 'Disallow: /admin' && ok "robots.txt" || bad "robots.txt"
 
 # 5. Caching and security headers
-h=$(hdr "$BASE/"); grep -qi '^cache-control: no-cache' <<<"$h" && ok "index.html no-cache" || bad "index.html cache-control"
+h=$(hdr "$BASE/admin/products"); grep -qi '^cache-control: no-cache' <<<"$h" && ok "static app shell no-cache" || bad "static shell cache-control"
+h=$(hdr "$BASE/"); grep -qi '^cache-control: public, max-age=60' <<<"$h" && ok "SSR page short cache" || bad "SSR cache-control"
+grep -qi '^cache-control:.*no-store' <<<"$h" && bad "SSR page no-store" || ok "SSR page never no-store"
+ET=$(grep -i '^etag:' <<<"$h" | cut -d' ' -f2-); [[ -n "$ET" ]] && ok "SSR ETag" || bad "SSR ETag missing"
+expect_code "304" -H "If-None-Match: $ET" "$BASE/"
 grep -qi "^content-security-policy: default-src 'self'" <<<"$h" && ok "CSP on app shell" || bad "CSP missing"
 grep -qi '^x-content-type-options: nosniff' <<<"$h" && ok "nosniff" || bad "nosniff missing"
 h=$(hdr "$BASE/sw.js"); grep -qi '^cache-control: no-cache' <<<"$h" && ok "sw.js no-cache" || bad "sw.js cache-control"
@@ -72,8 +76,26 @@ expect_code "200" "${API[@]}" -X POST -H "X-Cron-Token: $CRON_TOKEN" "$BASE/api/
 login() { # email -> access token via the real email-OTP flow (MAIL_DRIVER=log)
   curl -sk "${API[@]}" -H 'Content-Type: application/json' -d "{\"email\":\"$1\"}" "$BASE/api/v1/auth/email/request" >/dev/null
   local otp; otp=$(docker exec "$CT" sh -c "grep -l '$1' $WR/logs/emails/*.log | xargs ls -t | head -1 | xargs grep -o 'code-box\">[0-9]\{6\}' | grep -o '[0-9]\{6\}'")
-  curl -sk "${API[@]}" -H 'Content-Type: application/json' -d "{\"email\":\"$1\",\"code\":\"$otp\",\"name\":\"عميل تجريبي\"}" "$BASE/api/v1/auth/email/verify" | jq -r '.data.access_token'
+  curl -sk "${API[@]}" -D /tmp/verify_headers -H 'Content-Type: application/json' -d "{\"email\":\"$1\",\"code\":\"$otp\",\"name\":\"عميل تجريبي\"}" "$BASE/api/v1/auth/email/verify" | jq -r '.data.access_token'
 }
+# 6b. First run: ordering is CLOSED until the admin completes setup (real admin API flow)
+ADM=$(login "owner@smoke.test")
+[[ ${#ADM} -gt 20 ]] && ok "admin OTP login" || bad "admin login failed"
+AH=(-H "Authorization: Bearer $ADM" -H 'Content-Type: application/json')
+st=$(curl -sk "${AH[@]}" "$BASE/api/v1/admin/setup-status")
+[[ "$(jq -r .data.complete <<<"$st")" == false ]] && ok "fresh install: setup incomplete" || bad "setup-status ($st)"
+[[ "$(curl -sk "$BASE/api/v1/shop" | jq -r .data.orders_enabled)" == false ]] && ok "fresh install: ordering closed" || bad "ordering open on fresh install"
+expect_code "422" "${AH[@]}" -X PATCH -d '{"orders_enabled":true}' "$BASE/api/v1/admin/settings"
+expect_code "200" "${AH[@]}" -X PATCH -d '{"shop_whatsapp":"0911000000","shop_address":"عنوان المحل","working_hours":"يوميًا 9 ص - 9 م"}' "$BASE/api/v1/admin/settings"
+expect_code "200 201" "${AH[@]}" -X POST -d '{"bank_name":"بنك الخرطوم","account_name":"المتجر","account_number":"1000001","is_active":true}' "$BASE/api/v1/admin/payment-accounts"
+expect_code "200 201" "${AH[@]}" -X POST -d '{"rate_sdg":650}' "$BASE/api/v1/admin/rates"
+[[ "$(curl -sk "${AH[@]}" "$BASE/api/v1/admin/setup-status" | jq -r .data.complete)" == true ]] && ok "setup complete" || bad "setup still incomplete"
+expect_code "200" "${AH[@]}" -X PATCH -d '{"orders_enabled":true}' "$BASE/api/v1/admin/settings"
+
+# 6c. Test-only features do not exist in production
+expect_code "404" -X POST -H 'Content-Type: application/json' -d '{"email":"owner@smoke.test"}' "$BASE/api/v1/auth/testing-login"
+expect_code "404" "${AH[@]}" "$BASE/api/v1/admin/push/fake-log"
+
 A=$(login "a_$RANDOM@smoke.test"); B=$(login "b_$RANDOM@smoke.test")
 [[ ${#A} -gt 20 && ${#B} -gt 20 ]] && ok "OTP logins" || bad "OTP login failed"
 PID=$(curl -sk "${API[@]}" "$BASE/api/v1/products?per_page=20&in_stock=1" | jq -r '.data[0].id')
@@ -96,6 +118,26 @@ expect_code "403" "${API[@]}" -H "Authorization: Bearer $A" "$BASE/api/v1/admin/
 # 8. Uploaded files cannot execute under /uploads
 docker exec "$CT" sh -c 'echo "<?php echo 123;" > /var/www/html/uploads/products/x.php'
 expect_code "403" "$BASE/uploads/products/x.php"
+
+# 8b. Refresh cookie: HttpOnly + Secure + SameSite=Lax
+ck=$(grep -i '^set-cookie:' /tmp/verify_headers | tr -d '\r')
+grep -qi 'httponly' <<<"$ck" && grep -qi 'secure' <<<"$ck" && grep -qi 'samesite=lax' <<<"$ck" && ok "session cookie HttpOnly/Secure/Lax" || bad "cookie flags: $ck"
+
+# 9. uploads/ is an image allow-list
+docker exec "$CT" sh -c 'cp /tmp/r.png /var/www/html/uploads/products/ok.png; echo "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>1</script></svg>" > /var/www/html/uploads/products/x.svg; echo "<b>x</b>" > /var/www/html/uploads/products/x.html'
+expect_code "200" "$BASE/uploads/products/ok.png"
+expect_code "403" "$BASE/uploads/products/x.svg"
+expect_code "403" "$BASE/uploads/products/x.html"
+
+# 10. Maintenance switch: an empty .maintenance file in the web root -> 503 + Arabic page
+docker exec "$CT" sh -c 'touch /var/www/html/.maintenance'
+expect_code "503" "$BASE/"
+expect_code "503" "$BASE/api/v1/ping"
+curl -sk "$BASE/products" | grep -q 'قيد الصيانة' && ok "maintenance page body" || bad "maintenance page missing"
+hdr "$BASE/" | grep -qi '^retry-after:' && ok "Retry-After on 503" || bad "Retry-After missing"
+docker exec "$CT" sh -c 'rm -f /var/www/html/.maintenance'
+expect_code "200" "$BASE/api/v1/ping"
+expect_code "200" "$BASE/offline.html"
 
 echo; echo "passed: $PASS, failed: ${#FAILS[@]}"
 [[ ${#FAILS[@]} -eq 0 ]] || { printf ' - %s\n' "${FAILS[@]}"; exit 1; }

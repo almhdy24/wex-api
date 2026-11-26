@@ -5,6 +5,7 @@
 
 Options -Indexes -MultiViews
 DirectoryIndex index.html
+ErrorDocument 503 /maintenance.html
 ServerSignature Off
 
 AddType application/manifest+json .webmanifest
@@ -22,6 +23,13 @@ AddType image/avif .avif
     RewriteCond %{HTTP:X-Forwarded-Proto} !=https
     RewriteCond %{ENV:WEX_ALLOW_HTTP} !=1
     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+    # 1b. Maintenance mode: create an empty file named .maintenance in this folder to
+    #     return 503 with the Arabic maintenance page everywhere (delete it to go live).
+    #     The page and its icon stay reachable; Retry-After tells clients to come back.
+    RewriteCond %{DOCUMENT_ROOT}/.maintenance -f
+    RewriteCond %{REQUEST_URI} !^/(?:maintenance\.html|favicon\.(?:svg|png))$
+    RewriteRule ^ - [R=503,L]
 
     # 2. Never serve the core, dotfiles (except ACME), or sensitive file types
     RewriteRule ^__WEX_CORE_DIR__(/|$) - [F,L]
@@ -65,6 +73,10 @@ AddType image/avif .avif
     # App shell & service worker must revalidate on every load (deploys reach users)
     <FilesMatch "^(?:index\.html|sw\.js|registerSW\.js|manifest\.webmanifest)$">
         Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+    <FilesMatch "^maintenance\.html$">
+        Header always set Retry-After "600"
+        Header set Cache-Control "no-store"
     </FilesMatch>
     <FilesMatch "^sw\.js$">
         Header set Service-Worker-Allowed "/"

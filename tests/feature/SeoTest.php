@@ -62,7 +62,16 @@ final class SeoTest extends CIUnitTestCase
         $p = \Config\Database::connect()->table('products')->where('is_active', 1)->get(1)->getRow();
         $get = $this->get('/products/' . $p->slug);
         $head = $this->call('HEAD', '/products/' . $p->slug);
-        $this->assertStringStartsWith('no-cache', $get->response()->getHeaderLine('Cache-Control'));
+        $cc = $get->response()->getHeaderLine('Cache-Control');
+        $this->assertStringStartsWith('public, max-age=60', $cc);
+        $this->assertStringNotContainsString('no-store', $cc);
+        $etag = $get->response()->getHeaderLine('ETag');
+        $this->assertNotSame('', $etag);
+        // Revalidation with the ETag is a 304 with no body.
+        $again = $this->withHeaders(['If-None-Match' => $etag])->get('/products/' . $p->slug);
+        $again->assertStatus(304);
+        // (the test harness appends its buffered '\n'; a real 304 is sent without a body)
+        $this->assertSame('', trim((string) $again->getBody()));
         $this->assertSame($get->response()->getHeaderLine('Cache-Control'), $head->response()->getHeaderLine('Cache-Control'));
     }
 

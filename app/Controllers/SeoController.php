@@ -20,11 +20,26 @@ class SeoController extends BaseController
         $path = '/' . implode('/', array_map('strval', $segments));
         $out = (new SeoService())->render($path);
 
-        return $this->response
+        // Short shared caching with validators: a deploy reaches visitors within a minute,
+        // repeat views revalidate cheaply (304), and nothing is ever no-store.
+        $etag = '"' . substr(hash('sha256', $out['html']), 0, 32) . '"';
+        $response = $this->response
+            ->removeHeader('Cache-Control')->setHeader('Cache-Control', 'public, max-age=60, must-revalidate')
+            ->setHeader('ETag', $etag)
+            ->setHeader('Content-Security-Policy', self::APP_CSP);
+        $shell = FCPATH . '../index.html';
+        if (is_file($shell)) {
+            $response->setHeader('Last-Modified', gmdate('D, d M Y H:i:s', (int) filemtime($shell)) . ' GMT');
+        }
+
+        $inm = trim($this->request->getHeaderLine('If-None-Match'));
+        if ($out['status'] === 200 && $inm !== '' && in_array($etag, array_map('trim', explode(',', $inm)), true)) {
+            return $response->setStatusCode(304)->setBody('');
+        }
+
+        return $response
             ->setStatusCode($out['status'])
             ->setContentType('text/html', 'UTF-8')
-            ->removeHeader('Cache-Control')->setHeader('Cache-Control', 'no-cache, must-revalidate')
-            ->setHeader('Content-Security-Policy', self::APP_CSP)
             ->setBody($out['html']);
     }
 
