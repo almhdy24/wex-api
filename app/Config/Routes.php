@@ -6,6 +6,9 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 
+// Browser installer for hosts without SSH (404 unless INSTALL_TOKEN is set; see InstallController)
+$routes->match(['GET', 'POST'], 'api/install', '\App\Controllers\InstallController::index', ['filter' => 'throttle:20,600,install_ui']);
+
 // API Version 1 Routes
 $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static function (RouteCollection $routes) {
     // Health check

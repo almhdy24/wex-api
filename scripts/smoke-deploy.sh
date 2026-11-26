@@ -69,6 +69,11 @@ h=$(hdr "${API[@]}" "$BASE/api/v1/ping"); grep -qi "^content-security-policy: de
 expect_code "403" "${API[@]}" -X POST -H 'Content-Type: application/json' -d '{"admin_email":"x@y.z"}' "$BASE/api/v1/internal/install"
 expect_code "403" "${API[@]}" -X POST -H 'X-Install-Token: wrong' -H 'Content-Type: application/json' -d '{"admin_email":"x@y.z"}' "$BASE/api/v1/internal/install"
 expect_code "410" "${API[@]}" -X POST -H "X-Install-Token: $INSTALL_TOKEN" -H 'Content-Type: application/json' -d '{"admin_email":"again@wex.sd"}' "$BASE/api/v1/internal/install"
+# Browser installer (/api/install): token form only, refuses after install
+expect_code "200" "$BASE/api/install"
+curl -sk "$BASE/api/install" | grep -q 'install_token' && ok "installer page asks for the token" || bad "installer page"
+expect_code "403" -X POST -d 'install_token=wrong-token-wrong-token-wrong-token' "$BASE/api/install"
+expect_code "410" -X POST --data-urlencode "install_token=$INSTALL_TOKEN" "$BASE/api/install"
 expect_code "403" "${API[@]}" -X POST "$BASE/api/v1/internal/cron"
 expect_code "200" "${API[@]}" -X POST -H "X-Cron-Token: $CRON_TOKEN" "$BASE/api/v1/internal/cron"
 

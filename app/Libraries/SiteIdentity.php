@@ -4,7 +4,7 @@ namespace App\Libraries;
 
 /**
  * Sender identity derived from configuration, never from a hard-coded domain
- * (earlier defaults pointed at wextechnology.com / wex.sd, which are not the shop's).
+ * (earlier defaults pointed at domains that are not the shop's).
  */
 final class SiteIdentity
 {

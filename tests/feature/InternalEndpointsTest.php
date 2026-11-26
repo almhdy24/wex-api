@@ -184,4 +184,33 @@ final class InternalEndpointsTest extends CIUnitTestCase
         $this->assertTrue((new \App\Services\SetupStatusService())->status()['complete']);
         $this->withHeaders($auth)->withBodyFormat('json')->patch('api/v1/admin/settings', ['orders_enabled' => true])->assertStatus(200);
     }
+
+    /** Browser installer: gated, reveals nothing before the token, never echoes secrets, self-locks. */
+    public function testInstallerPageFlow(): void
+    {
+        $this->setEnv('INSTALL_TOKEN', null);
+        $this->get('api/install')->assertStatus(404);
+
+        $this->setEnv('INSTALL_TOKEN', self::INST);
+        $page = $this->get('api/install');
+        $page->assertStatus(200);
+        $html = (string) $page->getBody();
+        $this->assertStringContainsString('install_token', $html);
+        $this->assertStringNotContainsString(PHP_VERSION, $html, 'no environment report before the token');
+
+        $this->post('api/install', ['install_token' => 'wrong-token-wrong-token-wrong-token'])->assertStatus(403);
+
+        $check = (string) $this->post('api/install', ['install_token' => self::INST])->getBody();
+        $this->assertStringContainsString('فحص الاستضافة', $check);
+        $jwt = (string) env('JWT_SECRET', '');
+        if ($jwt !== '') {
+            $this->assertStringNotContainsString($jwt, $check, 'existing secrets are never displayed');
+        }
+
+        $done = $this->post('api/install', ['install_token' => self::INST, 'action' => 'install', 'admin_email' => 'page_' . bin2hex(random_bytes(3)) . '@shop.test', 'admin_name' => 'مدير']);
+        $done->assertStatus(200);
+        $this->assertStringContainsString('تم التثبيت بنجاح', (string) $done->getBody());
+
+        $this->post('api/install', ['install_token' => self::INST])->assertStatus(410);
+    }
 }
