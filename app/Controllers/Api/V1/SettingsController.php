@@ -47,6 +47,11 @@ class SettingsController extends BaseApiController
             'phone'                   => $map['shop_phone'] ?? '',
             'whatsapp'                => $map['shop_whatsapp'] ?? '',
             'working_hours'           => $map['working_hours'] ?? 'من 10 صباحاً إلى 10 مساءً، عدا الجمعة',
+            // Admin-editable but never sent: the storefront fell back to hard-coded values.
+            'shop_map_link'           => $map['shop_map_link'] ?? '',
+            'footer_text'             => $map['footer_text'] ?? '',
+            'social_facebook'         => $map['social_facebook'] ?? '',
+            'social_instagram'        => $map['social_instagram'] ?? '',
             'lock_hours'              => isset($map['lock_hours']) ? (int) $map['lock_hours'] : 4,
             'app_discount_percent'    => isset($map['app_discount_percent']) ? (int) $map['app_discount_percent'] : 3,
             'prices_updated_at'       => $pricesUpdatedAt,

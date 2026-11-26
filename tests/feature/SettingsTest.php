@@ -251,6 +251,15 @@ final class SettingsTest extends CIUnitTestCase
         $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
         $this->assertFalse($shop['orders_enabled']);
 
+        // Every admin-editable storefront field must come back from /shop.
+        $patch(['shop_map_link' => 'https://maps.google.com/?q=Test', 'footer_text' => 'نص التذييل', 'social_facebook' => 'https://facebook.com/wex', 'app_discount_percent' => 5, 'lock_hours' => 6])->assertStatus(200);
+        $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
+        $this->assertSame('https://maps.google.com/?q=Test', $shop['shop_map_link']);
+        $this->assertSame('نص التذييل', $shop['footer_text']);
+        $this->assertSame('https://facebook.com/wex', $shop['social_facebook']);
+        $this->assertSame(5, $shop['app_discount_percent']);
+        $this->assertSame(6, $shop['lock_hours']);
+
         $patch(['orders_enabled' => true, 'ticker_enabled' => false])->assertStatus(200);
         $shop = json_decode($this->get('/api/v1/shop')->getJSON(), true)['data'];
         $this->assertTrue($shop['orders_enabled']);
