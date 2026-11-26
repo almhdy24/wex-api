@@ -6,13 +6,19 @@ Phase 0 (truth & green):
 - [x] e2e 03 (mobile card tap dead -> DataList fix), 06 (heading), 07 (deterministic IA check), 02 (order number lookup), stock headroom in CI seed. e2e GREEN run 45632864710.
 - [x] Snapshot harness SW blocked; ui-check backend config (CORS/ERR_FAILED root cause), php -S on 127.0.0.1.
 - [x] VIS-05 = fixture artifact (API verified by test); fixtures fixed.
-- [ ] VIS-06 verify from next snapshot screenshots.
 - [x] PHPUnit on SQLite + MySQL 8 + MariaDB 10.6: 161 tests green on all (run 45632966956).
 - [x] D-5 exception headers, upload pixel limit + no copy fallback, D-10 ResponseContractTest (+ shipping_zone_name, brand_name, delivery_type fixes), D-8 N+1, D-7 index, D-9 memo, D-6 axios removed, GET de-dup.
 - [x] VIS-06: harness artifact (SW bypassed mocks); harnesses block SW.
 Phase 1 (HelioHost): DONE — deploy/heliohost layout, package-deploy.sh, deploy-package.yml; smoke 51/51 GREEN run 45656054300 (found+fixed: Authorization header dropped by Apache, installer state leak). Cron runner + installer (InternalEndpointsTest). docs/DEPLOY_HELIOHOST.md.
 Phase 2/4 so far: Arabic search (ArabicSearchTest), SW product cache 12h->network-first 10min, GET dedup, WhatsApp share + order help, SEO meta/JSON-LD/sitemap (SeoTest + smoke), claims (أصلي, الأكثر طلباً) removed + scanners.
-Next: Phase 3 glossary/copy checker + fixes; UX audit doc; report.
+Phase 3 (copy): DONE — glossary/dialect/currency checker web:2f9e65f, API wording 3245794, COPY_AUDIT/UX_AUDIT 4b8143f.
+Session 2026-11-26 (web unless noted):
+- [x] VIS-01 specs card blank for accessories + admin-saved products (83d9480); VIS-02 passed lock (adf566a); VIS-03 date bidi (233fbec); VIS-04 footer steps + Reveal capture artifact (dd5c422).
+- [x] PDP: compatible accessories restored, similar devices (c31d3da). Low-data mode (62c6eb6). Checkout option card wrap at 360px (8828a2a).
+- [x] WEB-AUTH-02 refresh on hidden tab + pre-token layout GETs (7cfd0dd).
+- [x] CI: ui-check API 4 workers, listener leak, in-flight diagnostics; snapshots: reduced motion, seeded cart, fresh pending fixture; e2e BUG 6 race. API: seed image slugs (94ec92f).
+- [x] Phase 5 admin: features present (verified in code), not redesigned. See docs/UX_AUDIT.md.
+Open: hero carousel vs one promise (product decision); typo-tolerant search; WebP/AVIF; desktop breadcrumbs + catalog scroll restore unverified visually; D-1..D-4, D-11.
 
 
 ## Deep Review & Hardening Pass (Branch: stabilize) — Active (started 2026-11-25)

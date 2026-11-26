@@ -64,6 +64,7 @@ Commit hashes are in wex-api unless prefixed `web:`.
 | WEB-SEC-01 | Medium | Web | RouteGuard GuestRoute, utils/url.js | `returnTo` unvalidated; `/\evil` bypass | Open redirect | Validate + harden | web:15fe693 | open-redirect.test.jsx | Fixed |
 | WEB-SEC-02 | Low | Web | utils/swPushHelpers.js | Push deep link `/\evil` | Cross-origin navigation | Always parse origin | web:a0da085 | open-redirect.test.jsx | Fixed |
 | WEB-TIME-01 | High | Web | api/client.js | Server clock taken from SW-cached responses | Price-lock countdown off by up to 12 h | Only `no-store` responses | web:3ff1a8d | server-clock.test.js | Fixed |
+| WEB-AUTH-02 | Medium | Web | context/AuthContext.jsx; StoreLayout, PendingOrderBanner, DesktopHeader | Reactivation refresh ran on visibilitychange→hidden (`visible \|\| onLine`); layout GETs fired before the bootstrap token | Refresh rotated mid-unload (reuse detection risk); 3 wasted 401+retry per page load; ui-check never reached networkidle | Refresh only when visible; layout fetches wait for bootstrap | web:7cfd0dd | auth-bootstrap-requests.test.jsx | Fixed |
 | WEB-PERF-01 | High | Web | pages/store/ProductDetailPage.jsx loadData | Effect dep on a cache object → infinite refetch | 346 requests/s per PDP view (API load, data, battery) | Read cache at call time | web:ffd586f | pdp-fetch-loop.test.jsx | Fixed |
 | WEB-HOOK-01 | Medium | Web | AdminUsersPage.jsx | Stale `updateParam` in memoised chips | Removing a chip wiped the search | Functional updates | web:218cfbd | hooks-regressions.test.jsx | Fixed |
 | WEB-ADM-01 | High | Web | AdminUsersPage.jsx emptyAction | Object passed as React child | Users page crashed on any empty filter result | Button node | web:218cfbd | hooks-regressions.test.jsx | Fixed |
@@ -77,12 +78,12 @@ Commit hashes are in wex-api unless prefixed `web:`.
 | CI-01 | Medium | CI | both repos | API had no CI; ui-check PHP 8.2/Node 20; vitest ran e2e specs; stale tests | Gates never ran | phpunit.yml; versions; excludes; tests updated | c8bf3cd, web:627e24f, web:b90653f, web:462ed0b | CI | Fixed |
 | E2E-03 | ? | Web | e2e/tests/03-admin-payments-lifecycle.spec.js:30 | `waitForURL` timeout after clicking first order card (mobile) | Admin journey unproven | — | — | — | UNVERIFIED |
 | E2E-07 | ? | Web | e2e/tests/07-quality-gates.spec.js:89 | Home IA order assertion fails on seeded data | — | — | — | — | UNVERIFIED |
-| VIS-01 | Low | Web | ProductDetailPage specs tab | Empty specs panel renders a blank card (no empty state) | Looks broken | — | — | screenshot | Deferred |
-| VIS-02 | Low | Web | OrderDetailPage countdown | Shows `00:00:00` + "السعر مثبت لمدة" when the lock has passed but status is still pending | Confusing | — | — | screenshot | Deferred |
-| VIS-03 | Low | Web | OrderDate | "م 8:00 2026/11/24" token order (bidi) | Hard to read | — | — | screenshot | Deferred |
-| VIS-04 | Low | Web | Desktop home | ~1,200 px of empty navy below the footer; footer lists 4 steps vs 3 on home | Polish | — | — | screenshot | Deferred |
-| VIS-05 | ? | Web | Admin order detail | Item/subtotal show `0 ج.س` while total is 680,000 | Wrong money display if real | — | — | screenshot (fixture may omit item SDG) | UNVERIFIED |
-| VIS-06 | ? | Web | Desktop home | Product skeletons persist after network idle with empty content | Possible stuck loading | — | — | screenshot | UNVERIFIED |
+| VIS-01 | Medium | Web | ProductDetailPage specs | Specs card blank for every accessory (power/output/capacity…) and every admin-saved product (Arabic keys); no empty state | Customers saw no specs | `buildSpecRows` maps English + Arabic keys, extra keys as rows, empty state; Arabic values `dir=auto` | web:83d9480 | product-specs.test.jsx | Fixed |
+| VIS-02 | Low | Web | utils/orderState.js | awaiting_proof ignored a passed lock: `00:00:00` + "السعر مثبت لمدة" + upload form until the expiry job ran | Confusing; upload refused | Expired state when the lock has passed | web:adf566a | payment-states.test.jsx | Fixed |
+| VIS-03 | Low | Web | OrderDate | Date and time in one LTR isolate: read as "م 8:00 2026/11/24" | Hard to read | Date LTR isolate, time its own RTL unit | web:233fbec | order-number-date.test.jsx | Fixed |
+| VIS-04 | Low | Web | Desktop home / footer | Empty band = capture artifact (`<Reveal>` opacity 0, full-page shots never scroll); footer 4 steps vs home 3 was real | Polish | Footer uses home's 3 steps; harnesses emulate reduced motion | web:dd5c422 | home-rescue.test.jsx; CI snapshot 45726783808 viewed | Fixed |
+| VIS-05 | — | Web | Admin order detail | `0 ج.س` items came from fixtures missing item SDG | None (fixture) | Fixtures fixed; API verified | web:96e3978 | OrderIntegrityTest | Not a defect |
+| VIS-06 | — | Web | Desktop home | Skeletons persisted because the service worker bypassed route mocks | None (harness) | Harnesses block the SW | — | CI snapshots | Not a defect |
 
 Known but not fixed (Deferred):
 - **D-1** (Low): access tokens stay valid for up to 15 minutes after logout-all (stateless JWT).
@@ -104,7 +105,7 @@ Known but not fixed (Deferred):
 3. The Phase 4 scenarios don't exist yet: concurrency e2e, authorization e2e, upload e2e, and the admin-route crawler with cross-surface sync.
 4. Response-field contract drift isn't checked (D-10); a renamed field degrades silently.
 5. A rate-limit bypass or global lockout behind a reverse proxy if `proxyIPs` isn't configured (D-3).
-6. Order-detail money display showing 0 for items (VIS-05) needs checking against the real API.
+6. (Resolved) VIS-05 was a fixture artifact; the API returns item SDG amounts (OrderIntegrityTest).
 7. The visual snapshot harness has never passed, so visual regressions go unnoticed.
 8. The OTP 6-digit space is protected by per-IP and per-email caps only. There's no global anomaly alerting.
 9. The service worker caches catalog GETs for 12 hours stale-while-revalidate. Customers can see stale prices or stock before revalidation; the server stays authoritative at checkout.

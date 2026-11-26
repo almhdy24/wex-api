@@ -39,14 +39,14 @@ Evidence types:
 | Typo tolerance | **Not done** (no cheap safe option on MySQL LIKE; candidate: trigram table) |
 | Product card badges from real low-stock threshold | API `stock_status` uses the setting (C). Badge copy **not re-audited** |
 | Sticky add-to-cart, gallery swipe/zoom, specs chips + table | Present (C, S) |
-| Related products / compatible accessories | Accessories present (C). "Related" **not present** |
+| Related products / compatible accessories | **Done** (web:c31d3da). Correction: accessories were *not* present; the app-shell redesign had dropped the section. Now 'ملحقات متوافقة' (admin-linked) and 'أجهزة مشابهة' (same category, one request; skipped on Data Saver) (T) |
 | Cart/checkout: guest until order step, inline Arabic validation, zone "name - fee", totals incl. delivery, double-submit protection, cart kept on error | Present (C, T for idempotency/notes) |
-| Post-order: lands on receipt upload, bank accounts + copy, countdown only while pending | Present (S). VIS-02 (00:00:00 while still pending) **open** |
+| Post-order: lands on receipt upload, bank accounts + copy, countdown only while pending | Present (S). VIS-02 **fixed** (web:adf566a, T) |
 | Push opt-in timing | Unchanged (built earlier) |
 | Offline page, skeletons, error states with next action | Present (C). Each state was **not** individually screenshotted |
 | Accessibility: contrast check script, 44 px targets (admin audit), RTL logical CSS | Scripts exist and pass in CI. A full manual a11y pass was **not done** |
-| Weak network: code splitting, lazy images, font-display | Present (C). **Bundle size not measured in this pass**; WebP/AVIF srcset **not implemented**; low-data mode **not implemented** |
+| Weak network: code splitting, lazy images, font-display | Present (C). **Bundle size not measured in this pass**; WebP/AVIF srcset **not implemented**; low-data mode **done** for network: Data Saver / 2G skips route prefetch, similar devices and the purchases ticker (web:62c6eb6, T) |
 
-## Admin structure (Phase 5): not addressed in this pass
+## Admin structure (Phase 5): present, not reworked
 
-The dashboard priorities, bulk actions, quick stock edit, settings grouping and "preview on storefront" link were not reworked. The existing e2e (spec 04) proves settings→storefront sync for `orders_enabled` only.
+Checked in code on 2026-11-26: the dashboard leads with the payment-review alert; bulk actions exist on orders and products; quick stock edit on the product list (`adminApi.updateStock`); settings are grouped into five titled cards; "معاينة في المتجر" links exist on the product list and the edit form. None was redesigned in this pass. The existing e2e (spec 04) proves settings→storefront sync for `orders_enabled` only.
