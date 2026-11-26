@@ -27,11 +27,13 @@ for (const [vpName, width, height] of viewports) {
     page.on('console', (m) => {
       // A guest's session bootstrap gets 401 from /auth/refresh by design.
       // "Failed to load resource" duplicates the response listener below, which names the URL.
-      if (m.type() === 'error' && !/status of 401|Failed to load resource/.test(m.text())) errors.push(m.text());
+      if (m.type() === 'error' && !/status of 401|Failed to load resource|FedCM|GSI_LOGGER|accounts\.google\.com/.test(m.text())) errors.push(m.text());
     });
     page.on('pageerror', (e) => errors.push(e.message));
     // Name the URL behind every failed resource, so a "Failed to load resource" is actionable.
     page.on('response', (r) => {
+      // Google Identity rejects the CI origin (127.0.0.1 is not an authorised origin): external, not ours.
+      if (r.url().startsWith('https://accounts.google.com/')) return;
       if (r.status() >= 400 && r.status() !== 401 && !r.request().isNavigationRequest()) errors.push(`HTTP ${r.status()} ${r.url().replace(base, '')}`);
     });
     try {
