@@ -510,6 +510,13 @@ class PushService
                     'failure_count'   => $sub->failure_count + 1,
                     'updated_at'      => $now,
                 ]);
+                // Surface the delivery reason in writable/logs so a host operator can see it
+                // without opening the database (mirrors the mail-failure logging).
+                log_message('error', 'Push delivery failed (status={status}, attempt={attempt}): {reason}', [
+                    'status'  => $result->statusCode ?? 'n/a',
+                    'attempt' => $attempts,
+                    'reason'  => $result->error ?? 'unknown',
+                ]);
                 $stats['failed']++;
             }
         }
