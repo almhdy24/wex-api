@@ -77,7 +77,7 @@ class SeoService
             if (!$page) {
                 return ['status' => 404, 'title' => 'الصفحة غير موجودة | ' . $shopName] + $default;
             }
-            return ['title' => $page->title . ' | ' . $shopName, 'description' => $this->excerpt((string) $page->body)] + $default;
+            return ['title' => $page->title . ' | ' . $shopName, 'description' => $this->excerpt(\App\Libraries\ArabicDuration::render((string) $page->body))] + $default;
         }
         if (preg_match('#^/products/([^/]{1,200})$#', $path, $m)) {
             return $this->productMeta(rawurldecode($m[1]), $shopName, $base, $default);

@@ -20,7 +20,7 @@ class ContentController extends BaseApiController
     public function heroSlides(): ResponseInterface
     {
         $slides = $this->service->getActiveHeroSlides();
-        $data = array_map(static fn($s) => $s->toArray(), $slides);
+        $data = array_map(static fn($s) => self::withDuration($s->toArray(), ['title', 'subtitle']), $slides);
         return $this->respondSuccess($data);
     }
 
@@ -40,7 +40,7 @@ class ContentController extends BaseApiController
     public function faq(): ResponseInterface
     {
         $items = $this->service->getActiveFaqItems();
-        $data = array_map(static fn($item) => $item->toArray(), $items);
+        $data = array_map(static fn($item) => self::withDuration($item->toArray(), ['question', 'answer']), $items);
         return $this->respondSuccess($data);
     }
 
@@ -50,7 +50,7 @@ class ContentController extends BaseApiController
     public function pages(): ResponseInterface
     {
         $pages = $this->service->getActivePages();
-        $data = array_map(static fn($p) => $p->toArray(), $pages);
+        $data = array_map(static fn($p) => self::withDuration($p->toArray(), ['title', 'body']), $pages);
         return $this->respondSuccess($data);
     }
 
@@ -60,6 +60,18 @@ class ContentController extends BaseApiController
     public function page(string $slug): ResponseInterface
     {
         $page = $this->service->getPageBySlug($slug);
-        return $this->respondSuccess($page->toArray());
+        return $this->respondSuccess(self::withDuration($page->toArray(), ['title', 'body']));
+    }
+
+    /** Admin content may use {{lock_duration}}; customers see the configured duration. */
+    private static function withDuration(array $row, array $fields): array
+    {
+        $hours = (new \App\Services\SettingService())->get('lock_hours', '4');
+        foreach ($fields as $f) {
+            if (isset($row[$f]) && is_string($row[$f])) {
+                $row[$f] = \App\Libraries\ArabicDuration::render($row[$f], $hours);
+            }
+        }
+        return $row;
     }
 }

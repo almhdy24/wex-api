@@ -301,7 +301,7 @@ class OrderService
                 'actor_user_id' => $userId,
                 'event_type'    => 'order_created',
                 'meta'          => json_encode($eventMeta),
-                'note'          => "تم إنشاء الطلب وتثبيت السعر لمدة {$lockHours} ساعات",
+                'note'          => 'تم إنشاء الطلب وتثبيت السعر لمدة ' . \App\Libraries\ArabicDuration::hours($lockHours),
                 'created_at'    => gmdate('Y-m-d H:i:s', $nowTime),
             ]));
 
@@ -1222,7 +1222,7 @@ class OrderService
             'actor_user_id' => $actorUserId,
             'event_type'    => 'lock_extended',
             'meta'          => json_encode($eventMeta),
-            'note'          => "قام المشرف بتمديد فترة حجز السعر لمدة {$extraHours} ساعات إضافية",
+            'note'          => 'قام المشرف بتمديد فترة حجز السعر لمدة ' . \App\Libraries\ArabicDuration::hours($extraHours) . ' إضافية',
             'created_at'    => gmdate('Y-m-d H:i:s'),
         ]));
 
