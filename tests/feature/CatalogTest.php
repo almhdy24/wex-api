@@ -118,6 +118,30 @@ final class CatalogTest extends CIUnitTestCase
         $this->assertFalse($body['success']);
     }
 
+    /** The admin product list had no image field: every row showed a placeholder. */
+    public function testAdminProductListIncludesPrimaryImage(): void
+    {
+        $db = \Config\Database::connect();
+        $product = $db->table('products')->orderBy('id', 'ASC')->get()->getRow();
+        $db->table('product_images')->where('product_id', $product->id)->delete();
+        $db->table('product_images')->insert([
+            'product_id' => $product->id, 'path' => '/uploads/products/t.jpg', 'thumb_path' => '/uploads/products/t_thumb.jpg',
+            'sort_order' => 0, 'is_primary' => 1, 'created_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+        $admin = (new UserModel())->where('role', Wex::ROLE_ADMIN)->first();
+        $access = (new TokenService())->generateAccessToken($admin);
+
+        $result = $this->withHeaders(['Authorization' => 'Bearer ' . $access['access_token']])
+            ->get('api/v1/admin/products?per_page=100');
+        $result->assertStatus(200);
+        $items = json_decode($result->getJSON(), true)['data'];
+        foreach ($items as $item) {
+            $this->assertArrayHasKey('image', $item);
+        }
+        $row = array_values(array_filter($items, static fn ($i) => (int) $i['id'] === (int) $product->id))[0];
+        $this->assertSame('/uploads/products/t_thumb.jpg', $row['image']['thumb_path']);
+    }
+
     public function testAdminCanCreateAndSoftDeleteProduct(): void
     {
         $userModel = new UserModel();

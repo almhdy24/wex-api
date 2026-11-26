@@ -251,7 +251,7 @@ class ProductService
      * @param list<int> $productIds
      * @return array<int, object>
      */
-    protected function primaryImagesFor(array $productIds): array
+    public function primaryImagesFor(array $productIds): array
     {
         if ($productIds === []) {
             return [];

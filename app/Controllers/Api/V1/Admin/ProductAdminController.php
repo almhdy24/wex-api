@@ -44,6 +44,14 @@ class ProductAdminController extends BaseApiController
 
         $result = $this->productService->listAdminProducts($filters, $page, $perPage);
         $presentedItems = AdminProductPresenter::presentCollection($result['items']);
+        // The admin list had no image at all: every row showed a placeholder. One preloaded
+        // query, same shape as the public list's `image`.
+        $images = $this->productService->primaryImagesFor(array_map(static fn ($i) => (int) $i['id'], $presentedItems));
+        foreach ($presentedItems as &$item) {
+            $img = $images[(int) $item['id']] ?? null;
+            $item['image'] = $img ? ['path' => $img->path, 'thumb_path' => $img->thumb_path] : null;
+        }
+        unset($item);
 
         return $this->respondPaginated(
             items: $presentedItems,
