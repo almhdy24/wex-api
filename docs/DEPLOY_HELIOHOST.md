@@ -1,104 +1,176 @@
 # Deploying Wex on HelioHost (single directory, no SSH)
 
-The site (React app) and the API are served from **one** web root. On HelioHost's Plesk the web root folder is called **`httpdocs`**. Elsewhere it is often `public_html`. Wherever this guide says *web root*, use whichever your host has.
+The storefront (React build) and the API (CodeIgniter 4) are served from **one** web root.
+HelioHost's Plesk calls it `httpdocs` on some accounts and `public_html` on others: wherever this
+guide says *web root*, use the folder Plesk shows for the domain.
 
-## What HelioHost provides (checked 2026-11-25)
+## 1. HelioHost findings (checked 2026-11-25/26)
 
-| Item | Finding | Source |
-|---|---|---|
-| PHP | 8.3, 8.4 and 8.5 on Tommy, Johnny and Morty (Lily: up to 8.5). Wex requires **8.3+**. Select it in Plesk > Websites & Domains > Dev Tools > PHP. A version change can take up to 2 hours. | [wiki/PHP](https://wiki.helionet.org/PHP) |
-| `memory_limit`, `max_execution_time` | "Intentionally limited", no published values (**UNVERIFIED**). The cron runner is time-boxed to 20 s (`CRON_TIME_BUDGET_SECONDS`) and uploads are capped at 5 MB / 40 MP. | [wiki/PHP](https://wiki.helionet.org/PHP), [forum](https://helionet.org/index/topic/41666-solved-changing-php-memory-limit-and-max-execution-time/) |
-| Extensions gd, intl, mbstring, mysqli | Not listed on the wiki (**UNVERIFIED**). Check the phpinfo page for your PHP version before installing. `api/index.php` refuses to start on PHP < 8.3. | wiki/PHP |
-| Database | MariaDB (and PostgreSQL) via Plesk, with phpMyAdmin. Use **MariaDB**. | [wiki/Plesk_Features](https://wiki.helionet.org/Plesk_Features) |
-| SSH | Off. Plesk Scheduled Tasks can run jailed commands. | [wiki/FAQ](https://wiki.helionet.org/FAQ) |
-| Cron | Plesk Scheduled Tasks: run a command, or "Fetch a URL". No count limit, but tasks count toward account load, and running every minute risks suspension. **Use every 5 minutes.** | [wiki/Cron_Jobs](https://wiki.helionet.org/Cron_Jobs) |
-| Upload size | Raising `upload_max_filesize` / `post_max_size` is by request on the forum. Wex needs ≤ 5 MB per image. | wiki/PHP |
-| `.htaccess` / mod_rewrite / mod_headers | The server is Apache (the wiki mentions Apache restarts). `AllowOverride` scope is **UNVERIFIED**. Post-deploy check 4 below tests it. | — |
+| Item | Finding | Consequence for Wex | Source |
+|---|---|---|---|
+| PHP | 8.3 / 8.4 / 8.5 selectable per domain (Tommy, Johnny, Morty). PHP runs as **CGI/FastCGI**, not mod_php. Version change can take up to 2 h. | Wex needs 8.3+; CI smoke runs Apache + **PHP-FPM 8.3** (no mod_php) to match. `php_flag` lines are wrapped in `<IfModule mod_php…>` (they would 500 under CGI). The `Authorization` header is re-exported by `.htaccess` (CGI drops it). | [wiki/PHP](https://wiki.helionet.org/PHP) |
+| `exec`, `proc_open`, `shell_exec` | Disabled. | Nothing in Wex shells out. Installer, migrations, secrets and cron all run in-process. | wiki/PHP, forum |
+| `memory_limit`, `max_execution_time` | "Intentionally limited", values not published (**UNVERIFIED**; the installer's check step shows them). | Cron is time-boxed (`CRON_TIME_BUDGET_SECONDS = 20`), uploads capped at 5 MB / 40 MP. | wiki/PHP |
+| Extensions gd, intl, mbstring, mysqli, openssl | Not listed (**UNVERIFIED**). | The installer check step lists each one with ✓/✗ before anything is written. | — |
+| Database | MariaDB (Plesk > Databases, phpMyAdmin). | CI tests the package on **MariaDB 10.6** and **MySQL 8.0** (strict SQL, utf8mb4). | [wiki/Plesk_Features](https://wiki.helionet.org/Plesk_Features) |
+| SSH | Off. | Browser installer at `/api/install`; upgrades via `POST /api/v1/internal/upgrade`. | [wiki/FAQ](https://wiki.helionet.org/FAQ) |
+| Cron | Plesk Scheduled Tasks ("Run a command/PHP script" or "Fetch a URL"). "Fetch a URL" **cannot send headers**. Every-minute tasks risk account suspension. | Run **every 5 minutes**. For "Fetch a URL" use the `?token=` form with `CRON_ALLOW_QUERY_TOKEN = true`. Price locks also expire lazily on read. | [wiki/Cron_Jobs](https://wiki.helionet.org/Cron_Jobs) |
+| `.htaccess` | Apache with `.htaccess`; exact `AllowOverride` scope **UNVERIFIED**. | Post-deploy check 4 detects a restricted `AllowOverride` (missing headers). | — |
+| Nameservers | `ns1.heliohost.org`, `ns2.heliohost.org`. | Step 9. | HelioHost signup / wiki |
 
-## Package layout (`wex-deploy-<version>.zip`)
+## 2. What is in the release zip
+
+`wex-technology-release-<version>.zip` (built and tested only in GitHub Actions, workflow
+**"Deploy package (HelioHost layout) + smoke test"**), with `….zip.sha256` and
+`wex-technology-upgrade-<version>.zip` next to it.
 
 ```
 <web root>/
-  index.html, assets/, sw.js, manifest.webmanifest, icons…   React build
-  .htaccess                     HTTPS, routing, security + caching headers
-  api/index.php, api/.htaccess  API front controller (/api/v1/...)
-  uploads/products/             public product images (no script execution)
-  _wex_core/                    app/, vendor/, writable/, .env  (denied to the web)
-  MANIFEST.txt                  sha256 of every file (blocked from the web)
+  index.html, assets/, sw.js, manifest.webmanifest, icons     React build
+  offline.html, maintenance.html  static pages (offline fallback, 503 page)
+  .htaccess                     HTTPS, routing, SSR routes (/, /catalog, /faq, /products/*, /pages/*,
+                                sitemap.xml, robots.txt), security + cache headers, maintenance switch
+  api/index.php, api/.htaccess  API front controller (/api/v1/…, /api/install)
+  uploads/                      public product images; only images are served, nothing executes
+  _wex_core/                    app/, vendor/, writable/, .env.example  (denied to the web)
+  MANIFEST.txt                  version, commits, build time, sha256 of every file (blocked from the web)
 ```
 
-The core folder name defaults to `_wex_core`. Build with a custom name in CI with `scripts/package-deploy.sh <wex-web> <version> <name>`. Receipts live in `_wex_core/writable/uploads/proofs` and are only streamed by PHP after the owner/admin check.
+Before a zip is published, CI:
+- scans it with `scripts/verify-package.sh` (no SQLite/logs/.env/tests/dev seeders, no
+  secrets or private keys, no placeholder phone numbers or domains). A self-test plants each
+  kind of violation and requires the scanner to reject it;
+- installs it on Apache + PHP-FPM 8.3 with MariaDB 10.6 **and** MySQL 8.0 through the browser
+  installer, runs `scripts/smoke-deploy.sh` (security, caching, first-run setup, full order
+  journey, permissions, uploads, maintenance), applies the upgrade zip on top, and runs a
+  Playwright pass at 360×800 and 1280×800 (fails on console errors, horizontal overflow, AED).
 
-Build the zip: GitHub > wex-api > Actions > "Deploy package (HelioHost layout) + smoke test" > Run workflow (or push a `v*` tag), then download the `wex-deploy-…` artifact. Every build is smoke-tested in Apache + MariaDB before it becomes an artifact.
+### Download it to the phone
 
-## First deployment (numbered steps)
+```sh
+termux-setup-storage            # once, grants ~/storage/downloads
+cd ~/storage/downloads
+RUN=$(gh run list -R <owner>/wex-api -w "Deploy package (HelioHost layout) + smoke test" -b stabilize -s success -L1 --json databaseId -q '.[0].databaseId')
+gh run download $RUN -R <owner>/wex-api -p 'wex-technology-release-*'
+cd wex-technology-release-* && sha256sum -c wex-technology-release-*.zip.sha256
+```
 
-1. **Plesk > Websites & Domains > PHP**: select PHP 8.3 (or 8.4). Open its phpinfo and confirm `gd`, `intl`, `mbstring`, `mysqli`.
-2. **Plesk > Databases > Add Database**: MariaDB, name e.g. `wex`, create a user with a strong password. Note the host (usually `localhost`), database, user and password.
-3. **Plesk > File Manager**: open the web root (`httpdocs`). Remove the default placeholder files. Upload `wex-deploy-<version>.zip` and **Extract** it there. The web root must now contain `index.html`, `api/`, `_wex_core/`.
-4. In `_wex_core/`, copy `.env.example` to **`.env`** and edit it:
-   - `app.baseURL = 'https://wex-technology.com/'`, `APP_URL = 'https://wex-technology.com'`
-   - the `database.default.*` values from step 2
-   - `encryption.key = hex2bin:<64 hex chars>` and `JWT_SECRET = <64 hex chars>` (generate with any password generator: 64 characters of 0-9a-f)
-   - `GOOGLE_CLIENT_IDS` (the web client ID), the SMTP settings, and the VAPID keys (generate once locally or in CI with `php spark push:keys`)
-   - `CRON_TOKEN = <64 random chars>` and `INSTALL_TOKEN = <64 random chars>`
-5. **Install** (pick one):
-   - **Without a shell (web installer):** from any computer, run
-     `curl -X POST https://wex-technology.com/api/v1/internal/install -H "X-Install-Token: <INSTALL_TOKEN>" -H "Content-Type: application/json" -d '{"admin_email":"you@example.com","admin_name":"صاحب المتجر"}'`
-     It runs all migrations and creates your admin account (you sign in with an email code or Google). It refuses without the token, and refuses forever after success (`_wex_core/writable/install.lock`).
-   - **With a Plesk Scheduled Task (CLI):** a one-off task running `/opt/plesk/php/8.3/bin/php -f httpdocs/_wex_core/spark migrate --all`, then `… spark admin:create` (follow the prompts in the task output).
-6. **Delete `INSTALL_TOKEN`** from `.env` (the installer is then invisible: 404).
-7. **SSL**: Plesk > SSL/TLS Certificates > Let's Encrypt for `wex-technology.com` and `www`. The `.htaccess` redirects HTTP to HTTPS, and HSTS is sent on HTTPS.
-8. **Domain**: point `wex-technology.com` (A/AAAA records, or HelioHost nameservers) to the account. Add it in Plesk if it isn't the main domain.
-9. **Periodic jobs**, every 5 minutes (pick one):
-   - **Plesk Scheduled Task, Run a command (preferred, no token in logs):** `/opt/plesk/php/8.3/bin/php -f httpdocs/_wex_core/spark cron:run`
-   - **Plesk Scheduled Task, Fetch a URL:** set `CRON_ALLOW_QUERY_TOKEN = true` in `.env`, then use URL `https://wex-technology.com/api/v1/internal/cron?token=<CRON_TOKEN>` (the token appears in access logs: rotate it if logs are shared).
-   - **External pinger** (e.g. cron-job.org): `POST https://wex-technology.com/api/v1/internal/cron` with header `X-Cron-Token: <CRON_TOKEN>`.
+Tagged builds (`git tag v1.0.0 && git push --tags`) also attach the zips to a GitHub Release:
+`gh release download v1.0.0 -R <owner>/wex-api -D ~/storage/downloads`.
 
-   One pass runs: expire overdue price locks (and restore stock), send queued push notifications and emails, lock-expiry reminders, and a daily integrity check (violations are logged as critical). Overlapping runs are rejected (409). Orders also expire lazily whenever they are read, so a missed run never leaves a stale lock visible.
-10. **Store settings**: sign in at `/login` with the admin email, then open Admin > Settings. Set the shop phone, WhatsApp, address, working hours, map link, payment accounts, the exchange rate, and shipping zones. Contact links stay hidden until real numbers are set.
+## 3. First deployment (numbered steps)
 
-## Post-deploy checks
+1. **PHP**: Plesk > Websites & Domains > PHP: select **8.3** (or 8.4). Wait until the version is active.
+2. **Database**: Plesk > Databases > Add Database: MariaDB, name e.g. `wex`, a new user with a
+   strong password. Note host (usually `localhost`), database, user, password.
+3. **Mailbox for sign-in codes**: Plesk > Mail > create `noreply@wex-technology.com` (or use any
+   SMTP provider). Sign-in is by email code (or Google), so **SMTP must work** before launch.
+4. **Upload**: Plesk > File Manager > web root. Delete the default placeholder files. Upload
+   `wex-technology-release-<version>.zip` and choose **Extract**. The web root must now contain
+   `index.html`, `api/`, `_wex_core/`, `MANIFEST.txt`. Delete the zip afterwards.
+5. **.env**: in `_wex_core/`, copy `.env.example` to `.env` and edit only these (checklist):
+   - [ ] `app.baseURL = 'https://wex-technology.com/'` and `APP_URL = 'https://wex-technology.com'`
+   - [ ] `database.default.hostname / database / username / password` from step 2
+   - [ ] `MAIL_FROM_EMAIL`, `email.SMTPHost` (e.g. `mail.wex-technology.com`), `email.SMTPUser`, `email.SMTPPass`, port 587 + tls (or 465 + ssl)
+   - [ ] `GOOGLE_CLIENT_IDS` (optional; Google sign-in)
+   - [ ] `INSTALL_TOKEN = <random, 32+ chars>` (any password generator)
+   - [ ] leave `encryption.key`, `JWT_SECRET`, `CRON_TOKEN`, `VAPID_*` **empty**: the installer fills them
+   - [ ] `CI_ENVIRONMENT = production` (already set; do not change)
+6. **Installer**: open `https://wex-technology.com/api/install` (or the temporary HelioHost
+   address if DNS is not ready). Enter the install token.
+   - Check step: every row ✓ (PHP version, extensions, writable folders, HTTPS, upload/memory
+     limits) and the database connection succeeds. Fix any ✗ first.
+   - Press **«توليد المفاتيح الناقصة»**: missing secrets are written into `.env` (shown once
+     only if `.env` is not writable; then paste them in by hand). Download a copy of `.env`
+     and keep it offline: losing `encryption.key` or `JWT_SECRET` cannot be undone.
+   - Enter the **admin email** (you sign in with a code sent to it) and press install.
+     Leave «محتوى تجريبي» **unchecked** for the real shop. The shop starts with **orders closed**.
+7. **Delete the installer**: remove the `INSTALL_TOKEN` line from `.env`. `/api/install` then
+   returns 404 (it already returns 410 after the install, because of `writable/install.lock`).
+8. **SSL**: Plesk > SSL/TLS Certificates > Let's Encrypt for `wex-technology.com` and
+   `www.wex-technology.com`. `.htaccess` redirects HTTP to HTTPS and sends HSTS.
+9. **Domain**: at the registrar of `wex-technology.com` set the nameservers to
+   **`ns1.heliohost.org`** and **`ns2.heliohost.org`** (propagation can take up to 24–48 h).
+   Add the domain in Plesk if it is not the account's main domain. Re-run step 8 once it resolves.
+10. **Cron, every 5 minutes** (Plesk > Scheduled Tasks > Add Task), pick one:
+    - "Run a PHP script": script `_wex_core/spark` (inside the web root), arguments `cron:run`; or
+    - "Fetch a URL": set `CRON_ALLOW_QUERY_TOKEN = true` in `.env`, URL
+      `https://wex-technology.com/api/v1/internal/cron?token=<CRON_TOKEN from .env>`
+      (the token appears in access logs; rotate it if logs are ever shared); or
+    - an external pinger (cron-job.org etc.): `POST …/api/v1/internal/cron` with header `X-Cron-Token`.
+    One pass expires overdue price locks (restoring stock), sends queued push/email, lock-expiry
+    reminders, and a daily integrity check. Overlapping runs get 409.
+11. **Store setup**: sign in at `/login` with the admin email. The dashboard shows
+    **«أكمل إعداد المتجر»** with what is missing. Required before orders can open: WhatsApp/phone,
+    shop address, working hours, at least one active payment account, the exchange rate.
+    Recommended: shipping zones, map link, price-lock hours. Add products and photos.
+    Then Admin > Settings > open orders (the server refuses until the required items are done).
+12. **Push (VAPID)**: keys were generated in step 6. Allow notifications on your phone, then
+    check a status change on a test order notifies you. If the keys are missing (host openssl
+    without EC support), generate them in CI with `php spark push:keys` and paste them into `.env`.
+13. **Verify**: run the post-deploy checks (§4) and the phone smoke checklist (§5).
+
+## 4. Post-deploy checks
 
 1. `https://wex-technology.com/api/v1/ping` returns JSON with `"success": true`.
-2. `https://wex-technology.com/_wex_core/.env` and `https://wex-technology.com/.env` return **403/404** (never the file).
-3. `https://wex-technology.com/products/<any-slug>` and `/admin/products` load the app (not an Apache 404).
-4. Browser devtools > Network > `index.html` shows `Cache-Control: no-cache` and a `Content-Security-Policy`. If these headers are missing, mod_headers / AllowOverride is restricted: ask HelioHost support.
-5. Admin > Settings shows your values; the storefront footer shows your phone/WhatsApp.
-6. Place a test order, upload a receipt, approve it in admin, and confirm the customer sees "confirmed".
-7. After 5–10 minutes, `_wex_core/writable/cron_state.json` shows a recent `last_run`.
+2. `/_wex_core/.env`, `/.env`, `/MANIFEST.txt`, `/_wex_core/writable/` return **403/404**.
+3. `/products/<slug>`, `/catalog`, `/admin/products` load the app (no Apache 404).
+4. Devtools > Network: `/` has `Cache-Control: public, max-age=60, must-revalidate` + `ETag`
+   and a `Content-Security-Policy`; `/admin/products` has `no-cache`. Missing headers mean
+   `AllowOverride`/mod_headers is restricted: ask HelioHost support.
+5. `/api/install` returns 404 (token removed).
+6. `/uploads/products/<file>.jpg` loads; any `.php`/`.svg`/`.html` under `/uploads/` is 403.
+7. After 10 minutes `_wex_core/writable/cron_state.json` shows a recent `last_run`.
 
-## Phone smoke checklist (10 steps, on mobile data)
+## 5. Phone smoke checklist (12 steps, ~5 minutes, on mobile data)
 
-1. Open the home page: it loads in a few seconds, shows products, and the Arabic text reads right-to-left.
-2. Search for a brand in Arabic and in Latin spelling (e.g. «ديل» / "Dell"): results appear.
-3. Open a product: price in ج.س, condition and availability shown, WhatsApp share works.
-4. Add to cart, go to checkout, choose delivery: the zone shows its fee and the total includes it.
-5. Sign in with an email code: the code arrives, and login keeps you on checkout.
-6. Confirm the order: you land on the receipt upload with bank accounts, copy buttons and the countdown.
-7. Upload a receipt photo from the gallery: the status becomes "قيد المراجعة".
-8. In the admin on the phone: the order appears with the receipt. Approve it.
-9. Back as the customer: the order shows as confirmed. A push notification arrives if enabled.
-10. Add to home screen (PWA), open it offline: the offline page appears, not a browser error.
+1. Home page loads in a few seconds, Arabic right-to-left, prices in ج.س (no AED anywhere).
+2. Search a brand in Arabic and Latin (e.g. «ديل» / "Dell"): results appear.
+3. Open a product: photos open full-screen and swipe; condition and availability are shown.
+4. Add to cart, checkout, choose delivery: the zone fee is added to the total.
+5. Sign in with an email code: the code arrives within a minute; you return to checkout.
+6. Confirm the order: the receipt page shows the bank account(s), copy buttons and the price-lock countdown (hours match the setting).
+7. Upload a receipt photo from the gallery: the status becomes «قيد المراجعة».
+8. Admin on the phone (`/admin`): the order appears with the receipt; approve it. Pages fit the screen, no sideways scrolling.
+9. Back as the customer: the order shows as confirmed; a push notification arrives if allowed.
+10. Admin > Settings: turn orders off, refresh the storefront: checkout is blocked with the closed notice. Turn orders back on.
+11. Open `/faq` and `/pages/terms`: the lock duration, shop address and hours are your real values (no `{{…}}`, no «—»).
+12. Add to home screen, turn on airplane mode, reopen: the offline page appears, not a browser error.
 
-## Upgrades
+## 6. Maintenance mode
 
-- Build a new zip. In the web root, **replace** `index.html`, `assets/`, `sw.js`, the manifest and icons, `api/`, `.htaccess`, `uploads/.htaccess`, and inside `_wex_core/` replace `app/`, `vendor/`, `spark` and `.htaccess`.
-- **Never overwrite** `_wex_core/.env`, `_wex_core/writable/`, or `uploads/products/` (contents).
-- Then run migrations: a one-off Scheduled Task `/opt/plesk/php/8.3/bin/php -f httpdocs/_wex_core/spark migrate --all`, or temporarily set a fresh `INSTALL_TOKEN`, delete `writable/install.lock`, re-run the installer with the existing admin email (migrations only; the admin is kept), then remove the token.
-- `MANIFEST.txt` lists every file's sha256, so you can compare what changed.
-- Open the site once: the service worker picks up the new build (the app shell is `no-cache`).
+Create an empty file named `.maintenance` in the web root (File Manager > New File). Every page
+and API call returns **503** with the Arabic maintenance page and `Retry-After: 600` (search
+engines keep the index). Delete the file to reopen.
 
-## Rollback
+## 7. Upgrades
 
-Keep the previous zip. Re-extract its files over the same paths (same exclusions as Upgrades). Migrations are additive, so the old code runs on the newer schema. If a migration must be undone, restore the database backup taken before the upgrade.
+1. Back up (§9) and turn on maintenance mode (§6).
+2. Upload `wex-technology-upgrade-<version>.zip` to the web root and **Extract**, overwriting.
+   This zip never contains `_wex_core/.env`, `_wex_core/writable/` or uploaded images, so live
+   data, receipts, sessions and the install lock are untouched (CI checks this).
+3. Delete `.maintenance`, then run migrations from any computer or phone:
+   `curl -X POST -H "X-Cron-Token: <CRON_TOKEN>" https://wex-technology.com/api/v1/internal/upgrade`
+   → `"success": true` and «تم تحديث قاعدة البيانات.» (403 without the token; rate-limited).
+4. The app shell is `no-cache`, so phones pick up the new build on the next visit.
+5. Compare `MANIFEST.txt` (version, commits, sha256 per file) to see what changed.
 
-## Backups
+## 8. Rollback
 
-- Database: weekly, and before every upgrade, use Plesk > Databases > Export Dump (or phpMyAdmin > Export).
-- Files: `_wex_core/.env`, `_wex_core/writable/uploads/proofs/` (receipts) and `uploads/products/`. Download them via the File Manager (Archive > Download).
-- Test a restore once on a spare database.
+Keep the previous upgrade zip and the database dump taken in §7 step 1. Turn on maintenance,
+extract the previous upgrade zip over the web root, and if the new version ran migrations,
+restore the dump (Plesk > Databases > Import Dump). Migrations are additive, so the database
+restore is only needed if the old code misbehaves on the newer schema. Delete `.maintenance`.
 
-## Split hosting (optional)
+## 9. Backups
 
-If the API ever lives on another origin, set `CORS_ALLOWED_ORIGINS` to the web origin, `COOKIE_SAMESITE=None` with `COOKIE_SECURE=true`, and build the web app with `VITE_API_BASE_URL=https://api.example.com/api/v1`.
+- Database: weekly and before every upgrade: Plesk > Databases > Export Dump (or phpMyAdmin > Export).
+- Files: `_wex_core/.env` (secrets), `_wex_core/writable/uploads/proofs/` (receipts),
+  `uploads/products/` (product photos): File Manager > select > Archive > Download.
+- Restore-test once on a spare database.
+
+## 10. Split hosting (optional)
+
+If the API ever lives on another origin, set `CORS_ALLOWED_ORIGINS` to the web origin,
+`COOKIE_SAMESITE = None` with `COOKIE_SECURE = true`, and build the web app with
+`VITE_API_BASE_URL=https://<api-domain>/api/v1`.
