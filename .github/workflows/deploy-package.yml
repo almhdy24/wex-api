@@ -50,9 +50,13 @@ jobs:
       - name: Build release package (runs verify-package.sh)
         id: pkg
         working-directory: wex-api
+        env:
+          # Public OAuth client ID (not a secret), baked into the web build for the Google button.
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
         run: |
           VERSION="${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}"
           scripts/package-deploy.sh ../wex-web "$VERSION" "$CORE"
+          grep -rqF "$VITE_GOOGLE_CLIENT_ID" build/deploy/webroot/assets || { echo "Google client ID missing from the web build"; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "name=wex-technology-release-$VERSION" >> "$GITHUB_OUTPUT"
 
