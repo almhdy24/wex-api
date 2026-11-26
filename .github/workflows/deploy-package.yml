@@ -215,6 +215,11 @@ jobs:
             $U -o /tmp/done.html
           grep -q 'تم التثبيت بنجاح' /tmp/done.html
           docker exec wex php -r '$d=new mysqli("127.0.0.1","wex","wexpass","wex"); $d->query("UPDATE products SET stock_quantity=50");'
+          # The zip ships no photos (by design) and sample content only references paths:
+          # stand in a plain JPEG for each, as the owner's uploads would be.
+          docker exec wex php -r '$d=new mysqli("127.0.0.1","wex","wexpass","wex"); $r=$d->query("SELECT path, thumb_path FROM product_images"); $n=0;
+            while ($row=$r->fetch_row()) foreach ($row as $p) { if (!$p) continue; $f="/var/www/html/".ltrim(parse_url($p, PHP_URL_PATH),"/"); @mkdir(dirname($f),0777,true);
+              $im=imagecreatetruecolor(800,600); imagefill($im,0,0,imagecolorallocate($im,226,232,240)); imagejpeg($im,$f,70); $n++; } echo "placeholder photos: $n\n";'
 
       - name: Smoke test (security, caching, first-run setup, journeys, permissions, maintenance)
         working-directory: wex-api
