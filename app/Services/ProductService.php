@@ -288,6 +288,8 @@ class ProductService
             'price_sdg'         => $this->pricingService->convertAedToSdg((int) $prod->price_aed, $rateSdg),
             'stock_status'      => $prod->getStockStatus($lowThreshold),
             'is_featured'       => (bool) $prod->is_featured,
+            // Compact spec map so list cards can show "i5 · 8GB · 256GB SSD" without a detail call.
+            'specs'             => $prod->getSpecs(),
             'image'             => $primaryImage ? [
                 'path'       => $primaryImage->path,
                 'thumb_path' => $primaryImage->thumb_path,

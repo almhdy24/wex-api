@@ -29,6 +29,9 @@ class PublicProductPresenter
             'price_sdg'         => (int) ($arr['price_sdg'] ?? 0),
             'stock_status'      => (string) ($arr['stock_status'] ?? 'in_stock'),
             'is_featured'       => (bool) ($arr['is_featured'] ?? false),
+            'specs'             => is_string($arr['specs'] ?? null)
+                ? (json_decode($arr['specs'], true) ?: [])
+                : (is_array($arr['specs'] ?? null) ? $arr['specs'] : []),
             'primary_image'     => isset($arr['image']) && is_array($arr['image']) ? ($arr['image']['path'] ?? null) : null,
             'thumb_url'         => isset($arr['image']) && is_array($arr['image']) ? ($arr['image']['thumb_path'] ?? null) : null,
             'image'             => isset($arr['image']) && is_array($arr['image']) ? [
