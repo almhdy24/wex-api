@@ -35,9 +35,12 @@ class Wex extends BaseConfig
     public const CONDITION_NEW           = 'new';
     public const CONDITION_USED_IMPORTED = 'used_imported';
 
+    public const CONDITION_REFURBISHED   = 'refurbished';
+
     public const CONDITIONS = [
         self::CONDITION_NEW,
         self::CONDITION_USED_IMPORTED,
+        self::CONDITION_REFURBISHED,
     ];
 
     // Delivery Types

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Libraries\SpecSchema;
 use App\Entities\Product;
 use App\Exceptions\ConflictException;
 use App\Exceptions\NotFoundException;
@@ -225,6 +226,8 @@ class ProductService
             'stock_status'      => $product->getStockStatus($lowThreshold),
             'warranty_text'     => $product->warranty_text,
             'specs'             => $product->getSpecs(),
+            'subcategory'       => $product->subcategory ?? null,
+            'spec_chips'        => SpecSchema::chips((string) $product->type, $product->getSpecData()),
             'is_featured'       => (bool) $product->is_featured,
             'category'          => $category ? [
                 'id'      => (int) $category->id,
@@ -290,6 +293,8 @@ class ProductService
             'is_featured'       => (bool) $prod->is_featured,
             // Compact spec map so list cards can show "i5 · 8GB · 256GB SSD" without a detail call.
             'specs'             => $prod->getSpecs(),
+            'subcategory'       => $prod->subcategory ?? null,
+            'spec_chips'        => SpecSchema::chips((string) $prod->type, $prod->getSpecData()),
             'image'             => $primaryImage ? [
                 'path'       => $primaryImage->path,
                 'thumb_path' => $primaryImage->thumb_path,
@@ -369,6 +374,18 @@ class ProductService
         if (isset($filters['is_active'])) {
             $builder->where('is_active', (int) $filters['is_active']);
         }
+        if (!empty($filters['out_of_stock'])) {
+            $builder->where('stock_quantity <=', 0);
+        }
+        if (!empty($filters['subcategory'])) {
+            $builder->where('subcategory', (string) $filters['subcategory']);
+        }
+        if (isset($filters['needs_review']) && $filters['needs_review'] !== '') {
+            $builder->where('needs_review', (int) $filters['needs_review']);
+        }
+        if (isset($filters['is_draft']) && $filters['is_draft'] !== '') {
+            $builder->where('is_draft', (int) $filters['is_draft']);
+        }
         if (!empty($filters['q'])) {
             $this->applySearch($builder, (string) $filters['q']);
         }
@@ -383,12 +400,29 @@ class ProductService
         ];
     }
 
+    /** @return array<string,int> */
+    public function adminCounts(): array
+    {
+        $count = fn (array $where) => (int) (new ProductModel())->where($where)->countAllResults();
+        return [
+            'all'          => $count([]),
+            'laptop'       => $count(['type' => Wex::PRODUCT_TYPE_LAPTOP]),
+            'phone'        => $count(['type' => Wex::PRODUCT_TYPE_PHONE]),
+            'accessory'    => $count(['type' => Wex::PRODUCT_TYPE_ACCESSORY]),
+            'needs_review' => $count(['needs_review' => 1]),
+            'draft'        => $count(['is_draft' => 1]),
+            'hidden'       => $count(['is_active' => 0, 'is_draft' => 0]),
+            'out_of_stock' => $count(['stock_quantity <=' => 0, 'is_draft' => 0]),
+        ];
+    }
+
     public function createProduct(array $data): Product
     {
         $this->validateProductData($data);
 
         $now = gmdate('Y-m-d H:i:s');
         $slug = $this->generateUniqueSlug($data['name']);
+        $isDraft = !empty($data['is_draft']) && \App\Libraries\Input::bool($data['is_draft']);
 
         $id = $this->productModel->insert([
             'type'              => $data['type'],
@@ -398,12 +432,16 @@ class ProductService
             'slug'              => $slug,
             'short_description' => $data['short_description'] ?? null,
             'description'       => $data['description'] ?? null,
-            'condition'         => $data['condition'],
-            'price_aed'         => (int) $data['price_aed'],
-            'specs'             => isset($data['specs']) ? (is_array($data['specs']) ? json_encode($data['specs'], JSON_UNESCAPED_UNICODE) : $data['specs']) : null,
+            'condition'         => $data['condition'] ?? Wex::CONDITION_NEW,
+            'price_aed'         => (int) ($data['price_aed'] ?? 0),
+            'specs'             => $this->specsForStorage($data),
+            'subcategory'       => !empty($data['subcategory']) ? (string) $data['subcategory'] : null,
+            'spec_data'         => $this->specDataForStorage($data),
+            'needs_review'      => 0,
+            'is_draft'          => $isDraft ? 1 : 0,
             'warranty_text'     => $data['warranty_text'] ?? null,
             'stock_quantity'    => isset($data['stock_quantity']) ? (int) $data['stock_quantity'] : 0,
-            'is_active'         => isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1,
+            'is_active'         => $isDraft ? 0 : (isset($data['is_active']) ? (int) \App\Libraries\Input::bool($data['is_active']) : 1),
             'is_featured'       => isset($data['is_featured']) ? (int) \App\Libraries\Input::bool($data['is_featured']) : 0,
             'created_at'        => $now,
             'updated_at'        => $now,
@@ -422,6 +460,9 @@ class ProductService
             throw new NotFoundException(lang('Api.product_not_found'));
         }
 
+        if (isset($data['spec_data'])) {
+            $data += ['type' => $product->type, 'condition' => $product->condition];
+        }
         $this->validateProductData($data, true);
 
         $updateFields = [];
@@ -437,11 +478,11 @@ class ProductService
         $allowedKeys = [
             'type', 'category_id', 'brand_id', 'short_description', 'description',
             'condition', 'price_aed', 'warranty_text', 'stock_quantity',
-            'is_active', 'is_featured',
+            'is_active', 'is_featured', 'subcategory', 'is_draft', 'needs_review',
         ];
 
         $intKeys  = ['category_id', 'price_aed', 'stock_quantity'];
-        $boolKeys = ['is_active', 'is_featured'];
+        $boolKeys = ['is_active', 'is_featured', 'is_draft', 'needs_review'];
         foreach ($allowedKeys as $key) {
             if (array_key_exists($key, $data)) {
                 $value = $data[$key];
@@ -460,6 +501,20 @@ class ProductService
             $updateFields['specs'] = is_array($data['specs'])
                 ? json_encode($data['specs'], JSON_UNESCAPED_UNICODE)
                 : $data['specs'];
+        }
+        if (isset($data['spec_data']) && is_array($data['spec_data'])) {
+            $type = (string) ($data['type'] ?? $product->type);
+            $cond = (string) ($data['condition'] ?? $product->condition);
+            $clean = SpecSchema::clean($type, $data['spec_data'], $cond);
+            $updateFields['spec_data'] = json_encode($clean, JSON_UNESCAPED_UNICODE);
+            $updateFields['specs'] = json_encode(SpecSchema::labelMap($type, $clean), JSON_UNESCAPED_UNICODE);
+            // Saving structured specs resolves a "needs review" flag.
+            $updateFields['needs_review'] = 0;
+        }
+        if (!empty($updateFields['is_draft'])) {
+            $updateFields['is_active'] = 0;
+        } elseif (array_key_exists('is_draft', $updateFields) && !array_key_exists('is_active', $updateFields)) {
+            $updateFields['is_active'] = 1; // publishing a draft
         }
 
         if (!empty($updateFields)) {
@@ -590,6 +645,7 @@ class ProductService
     {
         $errors = [];
         $has = static fn (string $k): bool => !$partial || array_key_exists($k, $data);
+        $draft = !empty($data['is_draft']) && \App\Libraries\Input::bool($data['is_draft']);
 
         if ($has('name') && trim((string) ($data['name'] ?? '')) === '') {
             $errors['name'] = 'اسم الجهاز مطلوب';
@@ -597,13 +653,13 @@ class ProductService
             $errors['name'] = 'اسم الجهاز طويل جداً';
         }
         if ($has('type') && (empty($data['type']) || !in_array($data['type'], Wex::PRODUCT_TYPES, true))) {
-            $errors['type'] = 'نوع المنتج غير صالح (laptop, phone, accessory)';
+            $errors['type'] = 'اختر نوع المنتج: حاسوب أو هاتف أو ملحق';
         }
-        if ($has('condition') && (empty($data['condition']) || !in_array($data['condition'], Wex::CONDITIONS, true))) {
-            $errors['condition'] = 'حالة المنتج غير صالحة (new, used_imported)';
+        if ($has('condition') && !($draft && empty($data['condition'])) && (empty($data['condition']) || !in_array($data['condition'], Wex::CONDITIONS, true))) {
+            $errors['condition'] = 'اختر حالة المنتج: جديد أو مستعمل مستورد أو مجدّد';
         }
-        if ($has('price_aed') && (!isset($data['price_aed']) || filter_var($data['price_aed'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 10000000]]) === false)) {
-            $errors['price_aed'] = 'سعر الدرهم مطلوب ويجب أن يكون رقماً صحيحاً أكبر من صفر';
+        if ($has('price_aed') && !($draft && empty($data['price_aed'])) && (!isset($data['price_aed']) || filter_var($data['price_aed'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 10000000]]) === false)) {
+            $errors['price_aed'] = 'السعر مطلوب ويجب أن يكون رقماً صحيحاً أكبر من صفر';
         }
         if (array_key_exists('stock_quantity', $data) && filter_var($data['stock_quantity'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100000]]) === false) {
             $errors['stock_quantity'] = 'الكمية يجب أن تكون رقماً صحيحاً بين 0 و 100000';
@@ -619,9 +675,42 @@ class ProductService
             $errors['brand_id'] = 'العلامة التجارية المحددة غير موجودة';
         }
 
+        if (!empty($data['subcategory']) && !in_array($data['subcategory'], SpecSchema::subtypeValues(), true)) {
+            $errors['subcategory'] = 'اختر نوع الملحق من القائمة';
+        }
+        $isDraft = !empty($data['is_draft']) && \App\Libraries\Input::bool($data['is_draft']);
+        if (!$partial && ($data['type'] ?? '') === Wex::PRODUCT_TYPE_ACCESSORY && empty($data['subcategory']) && !$isDraft && array_key_exists('spec_data', $data)) {
+            $errors['subcategory'] = 'اختر نوع الملحق';
+        }
+        if (isset($data['spec_data'])) {
+            if (!is_array($data['spec_data'])) {
+                $errors['spec_data'] = 'صيغة المواصفات غير صالحة';
+            } elseif (!empty($data['type']) && in_array($data['type'], Wex::PRODUCT_TYPES, true)) {
+                $errors += SpecSchema::validate((string) $data['type'], $data['spec_data'], $isDraft, $data['condition'] ?? null);
+            }
+        }
+
         if (!empty($errors)) {
             throw new ValidationFailedException($errors);
         }
+    }
+
+    /** Legacy `specs` text for storage; structured data (when sent) regenerates it from the schema. */
+    protected function specsForStorage(array $data): ?string
+    {
+        if (isset($data['spec_data']) && is_array($data['spec_data'])) {
+            $clean = SpecSchema::clean((string) $data['type'], $data['spec_data'], $data['condition'] ?? null);
+            return json_encode(SpecSchema::labelMap((string) $data['type'], $clean), JSON_UNESCAPED_UNICODE);
+        }
+        return isset($data['specs']) ? (is_array($data['specs']) ? json_encode($data['specs'], JSON_UNESCAPED_UNICODE) : $data['specs']) : null;
+    }
+
+    protected function specDataForStorage(array $data): ?string
+    {
+        if (!isset($data['spec_data']) || !is_array($data['spec_data'])) {
+            return null;
+        }
+        return json_encode(SpecSchema::clean((string) $data['type'], $data['spec_data'], $data['condition'] ?? null), JSON_UNESCAPED_UNICODE);
     }
 
     protected function generateUniqueSlug(string $name, ?int $ignoreId = null): string

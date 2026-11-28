@@ -30,12 +30,18 @@ class ProductAdminController extends BaseApiController
     /**
      * GET /api/v1/admin/products
      */
+    /** GET /admin/products/counts — tab badges for the product list. */
+    public function counts(): ResponseInterface
+    {
+        return $this->respondSuccess($this->productService->adminCounts(), 'أعداد المنتجات');
+    }
+
     public function index(): ResponseInterface
     {
         [$page, $perPage] = $this->getPaginationParams();
 
         $filters = [];
-        foreach (['type', 'category_id', 'is_active', 'q'] as $key) {
+        foreach (['type', 'category_id', 'is_active', 'q', 'subcategory', 'needs_review', 'is_draft', 'out_of_stock'] as $key) {
             $val = $this->request->getGet($key);
             if ($val !== null && $val !== '') {
                 $filters[$key] = $val;

@@ -29,6 +29,8 @@ class PublicProductPresenter
             'price_sdg'         => (int) ($arr['price_sdg'] ?? 0),
             'stock_status'      => (string) ($arr['stock_status'] ?? 'in_stock'),
             'is_featured'       => (bool) ($arr['is_featured'] ?? false),
+            'subcategory'       => $arr['subcategory'] ?? null,
+            'spec_chips'        => \App\Libraries\SpecSchema::chips((string) ($arr['type'] ?? ''), is_string($arr['spec_data'] ?? null) ? (json_decode($arr['spec_data'], true) ?: []) : (is_array($arr['spec_data'] ?? null) ? $arr['spec_data'] : [])),
             'specs'             => is_string($arr['specs'] ?? null)
                 ? (json_decode($arr['specs'], true) ?: [])
                 : (is_array($arr['specs'] ?? null) ? $arr['specs'] : []),
@@ -67,6 +69,8 @@ class PublicProductPresenter
             'price_sdg'         => (int) ($arr['price_sdg'] ?? 0),
             'stock_status'      => (string) ($arr['stock_status'] ?? 'in_stock'),
             'warranty_text'     => $arr['warranty_text'] ?? null,
+            'subcategory'       => $arr['subcategory'] ?? null,
+            'spec_chips'        => \App\Libraries\SpecSchema::chips((string) ($arr['type'] ?? ''), is_string($arr['spec_data'] ?? null) ? (json_decode($arr['spec_data'], true) ?: []) : (is_array($arr['spec_data'] ?? null) ? $arr['spec_data'] : [])),
             'specs'             => is_string($arr['specs'] ?? null)
                 ? json_decode($arr['specs'], true)
                 : ($arr['specs'] ?? []),

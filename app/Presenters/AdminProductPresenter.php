@@ -48,6 +48,13 @@ class AdminProductPresenter
             'specs'             => is_string($arr['specs'] ?? null)
                 ? json_decode($arr['specs'], true)
                 : ($arr['specs'] ?? []),
+            'subcategory'       => $arr['subcategory'] ?? null,
+            'spec_data'         => is_string($arr['spec_data'] ?? null)
+                ? (json_decode($arr['spec_data'], true) ?: new \stdClass())
+                : ($arr['spec_data'] ?? new \stdClass()),
+            'specs_legacy'      => is_string($arr['specs_legacy'] ?? null) ? json_decode($arr['specs_legacy'], true) : null,
+            'needs_review'      => (bool) ($arr['needs_review'] ?? false),
+            'is_draft'          => (bool) ($arr['is_draft'] ?? false),
             'warranty_text'     => $arr['warranty_text'] ?? null,
             'stock_quantity'    => (int) ($arr['stock_quantity'] ?? 0),
             'is_active'         => (bool) ($arr['is_active'] ?? false),

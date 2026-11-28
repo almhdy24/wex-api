@@ -31,6 +31,17 @@ class Product extends Entity
         return is_array($decoded) ? $decoded : [];
     }
 
+    /** Structured specs (schema keys => values); [] for legacy rows. */
+    public function getSpecData(): array
+    {
+        $raw = $this->attributes['spec_data'] ?? null;
+        if (is_array($raw)) {
+            return $raw;
+        }
+        $decoded = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
+        return is_array($decoded) ? $decoded : [];
+    }
+
     public function setSpecs(mixed $specs): self
     {
         $this->attributes['specs'] = is_array($specs)

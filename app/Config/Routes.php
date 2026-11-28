@@ -78,6 +78,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
     $routes->get('shop', 'SettingsController::shop');
     $routes->get('categories', 'CategoryController::index');
     $routes->get('brands', 'BrandController::index');
+    $routes->get('spec-schema', 'SpecSchemaController::index');
     $routes->get('products', 'ProductController::index');
     $routes->get('products/(:segment)', 'ProductController::show/$1');
     $routes->get('shipping-zones', 'ShippingZoneController::index');
@@ -175,6 +176,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
 
         // Products CRUD (Admin only)
         $routes->get('products', 'Admin\ProductAdminController::index', ['filter' => 'role:admin']);
+        $routes->get('products/counts', 'Admin\ProductAdminController::counts', ['filter' => 'role:admin']);
         $routes->post('products', 'Admin\ProductAdminController::create', ['filter' => 'role:admin']);
         $routes->get('products/(:num)', 'Admin\ProductAdminController::show/$1', ['filter' => 'role:admin']);
         $routes->patch('products/(:num)', 'Admin\ProductAdminController::update/$1', ['filter' => 'role:admin']);
