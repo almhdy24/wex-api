@@ -176,6 +176,7 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1'], static funct
 
         // Products CRUD (Admin only)
         $routes->get('products', 'Admin\ProductAdminController::index', ['filter' => 'role:admin']);
+        $routes->post('products/(:num)/restore', 'Admin\ProductAdminController::restore/$1', ['filter' => 'role:admin']);
         $routes->get('products/counts', 'Admin\ProductAdminController::counts', ['filter' => 'role:admin']);
         $routes->post('products', 'Admin\ProductAdminController::create', ['filter' => 'role:admin']);
         $routes->get('products/(:num)', 'Admin\ProductAdminController::show/$1', ['filter' => 'role:admin']);

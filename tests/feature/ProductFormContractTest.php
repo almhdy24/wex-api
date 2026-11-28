@@ -131,4 +131,21 @@ final class ProductFormContractTest extends CIUnitTestCase
             $this->assertArrayHasKey($k, $d);
         }
     }
+
+    public function testDeleteCanBeUndoneAndStatusFilterWorks(): void
+    {
+        $cat = (new \App\Models\CategoryModel())->first();
+        $res = $this->adminJson(['name' => 'مسودة للحذف', 'type' => 'phone', 'category_id' => $cat->id, 'is_draft' => true]);
+        $res->assertStatus(201);
+        $id = json_decode($res->getJSON(), true)['data']['id'];
+
+        $list = $this->withHeaders(['Authorization' => 'Bearer ' . $this->adminToken()])->get('/api/v1/admin/products?status=draft&per_page=100');
+        $ids = array_column(json_decode($list->getJSON(), true)['data'], 'id');
+        $this->assertContains($id, $ids);
+
+        $this->withHeaders(['Authorization' => 'Bearer ' . $this->adminToken()])->delete("/api/v1/admin/products/{$id}")->assertStatus(200);
+        $this->adminJson([], 'post', "/api/v1/admin/products/{$id}/restore")->assertStatus(200);
+        $show = $this->withHeaders(['Authorization' => 'Bearer ' . $this->adminToken()])->get("/api/v1/admin/products/{$id}");
+        $show->assertStatus(200);
+    }
 }

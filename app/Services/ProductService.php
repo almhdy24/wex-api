@@ -377,6 +377,26 @@ class ProductService
         if (!empty($filters['out_of_stock'])) {
             $builder->where('stock_quantity <=', 0);
         }
+        if (!empty($filters['condition']) && in_array($filters['condition'], Wex::CONDITIONS, true)) {
+            $builder->where('condition', $filters['condition']);
+        }
+        if (!empty($filters['brand_id'])) {
+            $builder->where('brand_id', (int) $filters['brand_id']);
+        }
+        switch ($filters['status'] ?? '') {
+            case 'published':
+                $builder->where('is_active', 1)->where('is_draft', 0);
+                break;
+            case 'draft':
+                $builder->where('is_draft', 1);
+                break;
+            case 'hidden':
+                $builder->where('is_active', 0)->where('is_draft', 0);
+                break;
+            case 'out':
+                $builder->where('stock_quantity <=', 0)->where('is_draft', 0);
+                break;
+        }
         if (!empty($filters['subcategory'])) {
             $builder->where('subcategory', (string) $filters['subcategory']);
         }
@@ -392,7 +412,16 @@ class ProductService
 
         $total = $builder->countAllResults(false);
         $offset = ($page - 1) * $perPage;
-        $items = $builder->orderBy('id', 'DESC')->findAll($perPage, $offset);
+        $sorts = [
+            'newest'     => ['id', 'DESC'],
+            'oldest'     => ['id', 'ASC'],
+            'price_asc'  => ['price_aed', 'ASC'],
+            'price_desc' => ['price_aed', 'DESC'],
+            'stock_asc'  => ['stock_quantity', 'ASC'],
+            'name'       => ['name', 'ASC'],
+        ];
+        [$col, $dir] = $sorts[$filters['sort'] ?? 'newest'] ?? $sorts['newest'];
+        $items = $builder->orderBy($col, $dir)->orderBy('id', 'DESC')->findAll($perPage, $offset);
 
         return [
             'items' => $items,
@@ -540,6 +569,19 @@ class ProductService
         }
 
         return (bool) $this->productModel->delete($id);
+    }
+
+    /** Undo of a soft delete (admin "تراجع"). */
+    public function restoreProduct(int $id): Product
+    {
+        $row = $this->productModel->onlyDeleted()->find($id);
+        if (!$row) {
+            throw new NotFoundException(lang('Api.product_not_found'));
+        }
+        $this->productModel->builder()->where('id', $id)->update(['deleted_at' => null]);
+        $this->refreshSearchText($id);
+
+        return $this->productModel->find($id);
     }
 
     public function updateStock(int $id, int $stockQuantity): Product

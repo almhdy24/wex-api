@@ -41,7 +41,7 @@ class ProductAdminController extends BaseApiController
         [$page, $perPage] = $this->getPaginationParams();
 
         $filters = [];
-        foreach (['type', 'category_id', 'is_active', 'q', 'subcategory', 'needs_review', 'is_draft', 'out_of_stock'] as $key) {
+        foreach (['type', 'category_id', 'is_active', 'q', 'subcategory', 'needs_review', 'is_draft', 'out_of_stock', 'condition', 'brand_id', 'status', 'sort'] as $key) {
             $val = $this->request->getGet($key);
             if ($val !== null && $val !== '') {
                 $filters[$key] = $val;
@@ -115,6 +115,17 @@ class ProductAdminController extends BaseApiController
         $this->audit('product_deleted', $id, []);
 
         return $this->respondSuccess(null, lang('Api.product_deleted'));
+    }
+
+    /**
+     * POST /api/v1/admin/products/{id}/restore — undo a delete.
+     */
+    public function restore(int $id): ResponseInterface
+    {
+        $product = $this->productService->restoreProduct($id);
+        $this->audit('product_restored', $id, []);
+
+        return $this->respondSuccess(AdminProductPresenter::present($product), 'تم استرجاع المنتج');
     }
 
     /**
